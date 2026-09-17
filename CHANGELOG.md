@@ -88,14 +88,18 @@ folders happen to be laid out is not a question a client ever has to care about.
   funoteka, and the same package carries the CLI (`scan`, `serve`, `stop`, `status`).
   Node refuses to strip types from anything under `node_modules`, so the package ships
   the sources compiled once at release — the repository itself still needs no build.
+- **A published container image**: `ghcr.io/kzntsv-dev/funoteka:0.1.0` and
+  `:latest` — `linux/amd64` and `linux/arm64` in one manifest, so the main
+  install path needs no checkout.
 - Daemon mode with `status` and `stop`, a pid file that is checked against the
   OS rather than believed, and `DEPLOY.md`.
 
 ### Known limitations
 
-- **No published container image and no cross-build.** The `Dockerfile` is
-  built by the machine that runs it and comes out for that machine's
-  architecture.
+- **The `arm64` leg of the published image is built under emulation** on an
+  `amd64` machine, and the `Dockerfile` in this repository still builds on the
+  machine that runs it — the path taken where a published image is not wanted or
+  not reachable.
 - **ffmpeg is needed for one case only:** cue segments inside m4a/ALAC. Without
   it those tracks answer with error code 70 and everything else keeps working.
 - **Some Subsonic endpoints are stubs** and say so instead of inventing an

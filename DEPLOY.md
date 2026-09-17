@@ -60,9 +60,29 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 
 ## 3. Path A — Docker (main path)
 
-Works the same on a laptop, a NAS and a VDS. The image is built on the machine
-that runs it (`build: .`), so it comes out `amd64` or `arm64` to match that
-machine — there is no published image and no cross-build yet.
+Works the same on a laptop, a NAS and a VDS. There is a **published image** —
+`ghcr.io/kzntsv-dev/funoteka:0.1.0`, `linux/amd64` and `linux/arm64` in one
+manifest — and `build: .` still builds on the machine that runs it (that is the
+path where a published image is not wanted or not reachable).
+
+With no checkout to build from, the image and four values are the whole
+installation (verified by running exactly this against the published image):
+
+```sh
+MUSIC=/absolute/path/to/your/music
+docker run -d --name funoteka -p 4533:4533 -p 4534:4534 \
+  -e FUNOTEKA_USER=you -e FUNOTEKA_PASSWORD=change-me \
+  -e FUNOTEKA_ADMIN_TOKEN=<the token you generated> \
+  -e FUNOTEKA_SUPERVISED=1 -e FUNOTEKA_LOG_FILE=/data/funoteka.log \
+  -v "$MUSIC":/music:ro -v funoteka-data:/data \
+  --restart unless-stopped ghcr.io/kzntsv-dev/funoteka:0.1.0
+```
+
+`FUNOTEKA_SUPERVISED=1` is what makes `POST /restart` a restart rather than a
+stop, and the restart policy beside it is what supervises the process. The first
+scan is still a command, not a startup side effect — see the end of this section.
+
+From a checkout, the same installation is the compose file:
 
 ```sh
 git clone <this repository> funoteka

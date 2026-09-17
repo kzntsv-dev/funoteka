@@ -10,9 +10,14 @@
 
 services:
   funoteka:
+    # Two ways in, and the checkout is the honest default: `build: .` builds
+    # the sources you just cloned, and `image:` names the result.
+    #
+    # With no checkout to build from, swap those two lines — drop `build:` and
+    # put the published image here instead:
+    #   image: ghcr.io/kzntsv-dev/funoteka:0.1.0
+    # (`linux/amd64` and `linux/arm64` in one manifest.)
     build: .
-    # Or a published image, once there is one. `build: .` is the honest default:
-    # a repository checkout that has never been published still deploys.
     image: funoteka:latest
     container_name: funoteka
 

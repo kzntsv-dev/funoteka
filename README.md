@@ -125,8 +125,8 @@ classification and you edit that layer, not your music.
   and the music reaches you through the Subsonic client you already like.
 - **Not tag-driven.** It will not merge your pressings, rename your artists to match an online
   database, or call home. Nothing about your collection leaves the machine.
-- **Not overclaiming.** Where a thing does not exist yet — a published cross-build, say — the docs
-  say so instead of pretending.
+- **Not overclaiming.** Where a thing does not exist yet — a Subsonic endpoint that is still a
+  stub, the `arm64` leg built under emulation — the docs say so instead of pretending.
 
 ## Documentation
 
