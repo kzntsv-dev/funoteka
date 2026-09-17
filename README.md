@@ -2,6 +2,13 @@
 
 **The Subsonic server a real collection deserves.**
 
+> ## Give `DEPLOY.md` to your agent.
+> Installing a music server means answering fiddly questions — where the music lives, which ports,
+> TLS or a reverse proxy, where the database goes, who may log in. Hand them to an agent: it reads
+> `DEPLOY.md`, asks you only what matters, installs funoteka (**Docker or native** — your machine,
+> your NAS, or a VDS), configures it, and then **keeps running it** — rescanning the library,
+> filtering junk, managing roots — over the **admin API and MCP**.
+
 **A folder is an album** — not a guess, not a heuristic: the rule. funoteka keys every record on
 its folder path, so three pressings of the same album stay three albums, a box stays a box and its
 discs, and an image file with a cue sheet becomes real, playable tracks. Nothing merged, nothing lost.
@@ -18,7 +25,9 @@ discs, and an image file with a cue sheet becomes real, playable tracks. Nothing
   folders, and what it writes stays on your disk: the meta layer, the log, and an audit file beside
   the database that records what was changed through the admin surface. Enrichment is possible
   later, and it is optional.
-- **An agent installs, configures and runs it.** Hand your agent `DEPLOY.md`.
+- **Any client you already like just works.** Symfonium, Feishin, Substreamer, Amcfy Music and
+  Castafiore have all reported themselves to this server, and none of them needed anything special;
+  the API is the point, the client is yours.
 
 A complete **Subsonic / OpenSubsonic** surface, filled from your own files wherever it can be and
 answered honestly and empty wherever it cannot — so the client you already like just works.
