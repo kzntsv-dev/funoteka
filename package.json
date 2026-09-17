@@ -1,6 +1,6 @@
 {
   "name": "funoteka",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Subsonic-compatible server: smart music library — scanner-classifier, cue splitting, meta layer, virtual tree",
   "license": "MIT",
   "type": "module",

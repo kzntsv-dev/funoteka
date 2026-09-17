@@ -9,6 +9,32 @@ The version lives in exactly one place — `package.json`.
 
 _(nothing yet)_
 
+## [0.1.3] — 2026-09-17
+
+### Changed
+
+- **The public README, which is a release artefact and ships in this package.**
+  Three things in it are new to a reader: **what it costs**, measured rather than
+  asserted (about 42 MB of RAM idle, 30 MB of SQLite for 3 432 songs, a 421 MB
+  image, and a collection that is only ever read); the **first scan is a step in
+  the quick start** (it was missing, so the documented install produced a server
+  with an empty library); and the **agent pitch opens the file**. The clients named
+  are the ones that have actually connected (`player`: Feishin, Symfonium,
+  Substreamer, Amcfy Music, Castafiore), not a compatibility wish-list.
+- **A checkout now has a working `funoteka`.** `bin` names `dist/cli.js` and a
+  clone had no `dist/` — so `npm install && npm link` produced a binary that
+  failed — until `prepare` was added to build it on install.
+- `DEPLOY.md` gained the two journeys that were guesses: the Windows service
+  wrapper versus the daemon that is in daily use, and the two things a NAS shows
+  that the command does not (the container's uid, and the arm64 half being built
+  under emulation).
+
+### Fixed
+
+- The engine of this patch is unchanged: no server code, no schema. What changed
+  is what a reader is told, and one line of `package.json` that makes the clone
+  behave.
+
 ## [0.1.2] — 2026-09-17
 
 ### Fixed
