@@ -1,0 +1,20 @@
+-- Which reading of a file's tags a file row is.
+--
+-- The same defect `probe_method` was added in 015 to fix, one table over. A file
+-- row carries the verdict of whichever reader last opened it — `tags_container`,
+-- from 012, is that verdict — and until now nothing said *which* reader it was.
+-- So a change of reader left verdicts behind that were no longer verdicts, and
+-- the collection carried them as facts.
+--
+-- It did, and this migration is the repair. The Ogg reader landed on 2026-09-13
+-- and the eighty `.ogg` files of the collection stayed read-and-empty: an
+-- earlier scan had stamped them with a reader that did not know the format, the
+-- files had not moved since, and the stage's own incrementality is what kept the
+-- new reader away from them. Nothing was wrong with the reader; nothing could
+-- reach it. The FLAC sweep before it had the same shape and was fixed by hand.
+--
+-- Zero is "a method older than the one this code reads with", which is what
+-- every row written before this migration is. `TAGS_METHOD` in `src/tags/read.ts`
+-- is the number rows carry from here on, and raising it is how a change of
+-- reader is announced: every file below it is read again, once.
+ALTER TABLE file ADD COLUMN tags_method INTEGER NOT NULL DEFAULT 0;

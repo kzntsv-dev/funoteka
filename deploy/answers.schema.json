@@ -1,0 +1,151 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://funoteka/deploy/answers.schema.json",
+  "title": "funoteka deployment answers",
+  "description": "The questions DEPLOY.md asks, in a form a program can hold. An agent that has been handed answers instead of asking for them reads this for the shape; an agent that has to ask reads the descriptions, which say why each answer matters and what happens when it is left out. Every property except the music directory and the listener credentials has a default, and the defaults are a working server.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["music", "user", "password"],
+  "properties": {
+    "target": {
+      "description": "Which path of DEPLOY.md to follow. Docker is the main path: one command, and ffmpeg comes inside the image. The native paths are for a machine where Docker is not wanted, and need Node 24 and ffmpeg installed.",
+      "enum": ["docker", "linux-service", "windows-service"],
+      "default": "docker"
+    },
+    "host": {
+      "description": "The machine this is being deployed to, as the person answering would name it. Used in the steps that have to be run there rather than here; nothing in the deployment depends on it.",
+      "type": "string"
+    },
+
+    "music": {
+      "description": "Absolute path to the collection, as the SERVER sees it. For the docker target that is the path inside the container (the compose file mounts the host's directory at /music), and for the native targets it is the path on the machine. It is mounted read-only: nothing in this server ever writes to, moves or renames a file of yours.",
+      "type": "string"
+    },
+    "data": {
+      "description": "Where the server keeps what is its own: the meta layer (a SQLite file), its re-encode cache, its log, its audit file and the config file. This directory is the whole of what a backup takes, apart from the music itself.",
+      "type": "string",
+      "default": "./data"
+    },
+
+    "musicPort": {
+      "description": "The port music clients connect to. 4533 is Subsonic's own, so a client that guesses one guesses right.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "default": 4533
+    },
+    "adminPort": {
+      "description": "The port the admin surface listens on. It is meant to be reachable from outside — that is what it is for — and it is guarded by its own token rather than by not being reachable. One more than the music port, so it is one number to remember.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "default": 4534
+    },
+
+    "user": {
+      "description": "The listener's name. Subsonic clients send it with every request.",
+      "type": "string",
+      "minLength": 1
+    },
+    "password": {
+      "description": "The listener's password. The server REFUSES TO START without a password or an api key: a music library on the open network is not 'it came up', it is a misconfiguration.",
+      "type": "string",
+      "minLength": 1
+    },
+    "apiKey": {
+      "description": "An alternative to the password, for a client that would rather not hold one (OpenSubsonic's apiKeyAuthentication). Either one is enough; both may be set.",
+      "type": "string"
+    },
+    "adminToken": {
+      "description": "The admin surface's whole gate, and the admin surface does not exist without it: with no token the port is not open at all. Generate one with `node -e \"console.log(require('crypto').randomBytes(32).toString('base64url'))\"`. It is a credential: keep it out of the music directory and out of git.",
+      "type": "string"
+    },
+    "adminAllow": {
+      "description": "Who may reach the admin port at all, as comma-separated addresses and CIDR blocks. Empty means every address, which is what the token is then carrying on its own. A second lock, not the gate.",
+      "type": "string",
+      "default": ""
+    },
+    "adminTrustProxy": {
+      "description": "Whether X-Forwarded-For may be believed when deciding adminAllow. False unless a proxy is the only way in: the header is written by the caller, so believing it on a directly reachable port means anyone can claim any address and walk through the allowlist.",
+      "type": "boolean",
+      "default": false
+    },
+    "tls": {
+      "description": "How the admin port is encrypted. 'self' terminates TLS here and needs tlsCert and tlsKey (both or neither; a path that cannot be read stops the server at startup). 'proxy' leaves the port plain and expects a reverse proxy in front of it — not a weaker arrangement, and the one to narrow adminAllow to the proxy's address for. 'none' is for a deployment on a private network.",
+      "enum": ["none", "self", "proxy"],
+      "default": "none"
+    },
+    "tlsCert": {
+      "description": "Path to the certificate, when tls is 'self'.",
+      "type": "string"
+    },
+    "tlsKey": {
+      "description": "Path to its private key, when tls is 'self'.",
+      "type": "string"
+    },
+
+    "supervised": {
+      "description": "Whether something will start this process again after it exits — a restart policy, a systemd unit, a service wrapper. It is what makes POST /restart a restart rather than a stop, and where it is false the route refuses with a 409 instead of taking the music down. The compose file and the unit set it; a bare `serve --daemon` has nobody and should say so.",
+      "type": "boolean",
+      "default": true
+    },
+    "scanInterval": {
+      "description": "Minutes between the scans the server starts by itself. Zero turns the timer off, for a deployment with a cron job of its own.",
+      "type": "integer",
+      "minimum": 0,
+      "default": 360
+    },
+    "scanQuietFrom": {
+      "description": "The first hour (0-23, local) in which a scan may not START. A scan is audible — it reads every file — and these are the hours a house is asleep in. A scan that comes due inside the window waits for the end of it rather than being skipped.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 23,
+      "default": 3
+    },
+    "scanQuietTo": {
+      "description": "The hour the quiet window ends. Equal to scanQuietFrom means no quiet hours at all. The window may cross midnight (23 to 6).",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 23,
+      "default": 6
+    },
+    "scanWatch": {
+      "description": "Watch the roots for changes instead of waiting for the interval. It waits for five seconds of silence first, so a file being copied in is never read halfway. It cannot work on a network share — the server says so in the log and falls back to the interval rather than pretending.",
+      "type": "boolean",
+      "default": false
+    },
+
+    "logFile": {
+      "description": "A file to append this process's own output to, for a deployment whose supervisor collects nothing. Leave it out where Docker, systemd or the service wrapper already collects it.",
+      "type": "string",
+      "default": ""
+    },
+    "ffmpeg": {
+      "description": "The ffmpeg binary, needed only to cut cue tracks out of an .m4a/MP4 image. The Docker image has one; a native install has to provide it. Without it those tracks are refused with a reason and everything else works.",
+      "type": "string",
+      "default": "ffmpeg"
+    }
+  },
+  "examples": [
+    {
+      "target": "docker",
+      "music": "/music",
+      "data": "./data",
+      "user": "you",
+      "password": "change-me",
+      "adminToken": "…32 random bytes…",
+      "supervised": true
+    },
+    {
+      "target": "linux-service",
+      "music": "/srv/music",
+      "data": "/var/lib/funoteka",
+      "user": "you",
+      "password": "change-me",
+      "adminToken": "…32 random bytes…",
+      "adminAllow": "10.0.0.0/8",
+      "tls": "proxy",
+      "adminTrustProxy": true
+    }
+  ]
+}

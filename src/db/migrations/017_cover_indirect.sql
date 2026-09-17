@@ -1,0 +1,23 @@
+-- What kind of place a cover's `offset` and `length` name.
+--
+-- Until now there was one kind and no need to say so: the range was the image,
+-- a run of the audio file a client could be sent. A picture carried as a
+-- `METADATA_BLOCK_PICTURE` comment — which is how an Ogg file holds a cover at
+-- all, and how all eighty of this collection's `.ogg` files hold theirs — is a
+-- different kind of place. It is base64 of a picture block inside a packet that
+-- the lacing rule scatters across pages, so no range of the file *is* the image;
+-- what can be written down is a range worth reading.
+--
+-- So the column says which of the two a row means:
+--
+--   'image'     [offset, length) is the picture. Every row written before this
+--               migration, and every reader that names a picture's own bytes —
+--               MP4 `covr`, ID3v2 `APIC`, a FLAC PICTURE block.
+--   'indirect'  [offset, length) is a region that holds the picture and must be
+--               read and parsed to get it. `src/cover/picture.ts` does that.
+--
+-- The picture was already being read and thrown away by this collection's
+-- reader — it arrived as just another comment and left as a tag of a hundred and
+-- eighty kilobytes of base64 — so nothing here is a new discovery. What is new
+-- is that it goes somewhere useful.
+ALTER TABLE cover_art ADD COLUMN kind TEXT NOT NULL DEFAULT 'image';

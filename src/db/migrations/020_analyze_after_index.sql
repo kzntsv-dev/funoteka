@@ -1,0 +1,16 @@
+-- The statistics a new index invalidates, refreshed.
+--
+-- `019_file_tag_name_file_value.sql` added an index, and a migration is not a
+-- scan: `runStages` refreshes the planner's statistics at the end of every run
+-- (`run.ts`, the 'planner' stage) and it never ran here. So SQLite kept the
+-- estimates it had made while that index did not exist and chose its plan for the
+-- listing accordingly. Measured on a copy of the live collection, 500-record
+-- `getAlbumList2` went from 29.8 ms to 68.6 ms the moment the index appeared, and
+-- back to 24.7 ms once `ANALYZE` had run — better than it was without the index at
+-- all, which is what the index was for.
+--
+-- This is the trap `run.ts` already describes, arriving through a door that file
+-- does not cover: the planner's numbers are derived from the data, and anything
+-- that changes the data *or the graph above it* has to say so. A future migration
+-- that adds an index owes the same line.
+ANALYZE;

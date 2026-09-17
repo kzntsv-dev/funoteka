@@ -1,0 +1,20 @@
+-- The genre a file states, findable without reading the file's row.
+--
+-- `ALBUM_GENRES` drives from `file_tag` filtered by name — 2702 rows on this
+-- collection — and then reads each row to get its `file_id` and its value.
+-- `idx_file_tag_name` answers the name and stops there, so every one of those
+-- rows costs a table read. Carrying `file_id` and `value` in the index makes the
+-- scan covering, and measured on a copy of the live collection, warm and
+-- interleaved with the baseline so that drift touches both equally, it halves the
+-- join: 8.32 ms to 4.18. `ALBUM_GENRES` as a whole goes from 14.98 to 12.11 ms,
+-- the window function being what is left.
+--
+-- It is not free: the index carries every tag value, and `VACUUM`ed the database
+-- grows from 12.3 MB to 14.2. Fifteen per cent of the meta layer for about three
+-- milliseconds on a listing route. That is a small win and it is written down as
+-- one rather than dressed up.
+--
+-- `(name, file_id)` without the value was measured too and buys nothing — 8.05
+-- against 8.32 — because what the join saves is the table read, and the value is
+-- what it wanted from the table.
+CREATE INDEX idx_file_tag_name_file_value ON file_tag (name, file_id, value);

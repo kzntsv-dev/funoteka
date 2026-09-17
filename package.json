@@ -1,0 +1,25 @@
+{
+  "name": "funoteka",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Subsonic-compatible server: smart music library — scanner-classifier, cue splitting, meta layer, virtual tree",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "bin": {
+    "funoteka": "./src/cli.ts"
+  },
+  "scripts": {
+    "scan": "node src/cli.ts scan",
+    "serve": "node src/cli.ts serve",
+    "smoke": "node deploy/smoke.mjs",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,24 @@
+-- The cue that plays an audio file, found by that file.
+--
+-- `cue.audio_file_id` is what every reader of a cue track joins on: the
+-- inventory's performer column, its "audio files with no track or cue" counter,
+-- and the artist stage's own binding of a cue to the file it came from. The
+-- table carried only its own primary key, so each of those questions was a full
+-- scan of `cue` — and one of them is asked once per track.
+--
+-- Measured on a 472-album collection, 5054 tracks against 302 cues: the
+-- inventory's performer subquery cost 120.7 ms of the dump's 171.0 ms, because
+-- every track read all 302 cues. With this index the same subquery is 28.4 ms
+-- and the whole dump 72.7 ms.
+--
+-- **The review that found this attributed the cost to the wrong thing**, and the
+-- correction is worth keeping: `GET /inventory` ran 1416 statements (three per
+-- album) and the dump was read as "73% statement executions". Executing the same
+-- three statements once for the whole collection — which is a real improvement
+-- and is kept — bought only about 20%. The executions were expensive for the
+-- rows they read, not for their number, and the rows were expensive because this
+-- index was missing.
+--
+-- Nothing about the answers changes: this is an index, not a redefinition, so no
+-- reader's output moves by a byte.
+CREATE INDEX idx_cue_audio_file ON cue (audio_file_id);

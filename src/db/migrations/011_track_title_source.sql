@@ -1,0 +1,28 @@
+-- Where a track's title came from — the cue, the file's tag, or its name.
+--
+-- The project's rule is that a value has to say whether it is knowledge or a
+-- guess — `title_source` on album and release, `duration_source` on
+-- `audio_probe`, `encoding_confidence`, `ambiguous`. Track titles were the one
+-- place the chain could not say: three sources now feed it and two of them are
+-- weaker than the first.
+--
+-- The distinction is not academic. A cue is a document about *this* record and
+-- a tag is a statement somebody made about the track, while a title read off a
+-- file name is a hint the filesystem happens to carry — `back to archangelsk`
+-- written in lower case, with the artist's name and the release group cut off
+-- it by a rule that guessed where they ended. That is a name worth having
+-- where there is nothing else, and worth being able to tell apart from one
+-- somebody wrote.
+--
+--   'cue'   a TITLE in a cue that describes these files. The authority.
+--   'tag'   the file's own TITLE tag. Beats the folder, loses to the cue.
+--   'name'  read off the file name (see `cue/track-name.ts`). The last word,
+--           and the one that says out loud that it is a guess.
+--
+-- NULL where no source named the track — which includes a source that spoke and
+-- was rejected as a ripper's marker (`(empty)`, `(silence)`), because the value
+-- the row would carry is not a name at all. Also NULL for rows written before
+-- this column, which is honest: they were written when the distinction was not
+-- being made.
+
+ALTER TABLE track ADD COLUMN title_source TEXT;

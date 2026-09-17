@@ -1,0 +1,90 @@
+# funoteka as a service: one container, two ports, one directory of its own.
+#
+#   cp .env.example .env      # and put a password and an admin token in it
+#   docker compose up -d
+#   docker compose logs -f
+#
+# The two things to change before this is reachable from anywhere: MUSIC, which
+# is the collection to serve read-only, and DATA, which is where the meta layer,
+# the re-encode cache and the log go.
+
+services:
+  funoteka:
+    build: .
+    # Or a published image, once there is one. `build: .` is the honest default:
+    # a repository checkout that has never been published still deploys.
+    image: funoteka:latest
+    container_name: funoteka
+
+    # **What makes `POST /restart` mean restart rather than stop.** The admin
+    # surface answers 200 and exits; this is the policy that starts it again.
+    # Without it the door still opens and the answer says so — the server
+    # refuses rather than taking the music down.
+    restart: unless-stopped
+
+    env_file:
+      - .env
+    environment:
+      # Said here rather than in .env, because it is a fact about *this* file:
+      # the restart policy above is what supervises the process, and a bare
+      # `docker run` without it must not claim otherwise.
+      FUNOTEKA_SUPERVISED: "1"
+      FUNOTEKA_DB: /data/funoteka.db
+      # **So `GET /logs` has something to answer with.** A container's supervisor
+      # already collects the process's output as the compose log, which is why
+      # this went unset — and the result was an admin route that always answered
+      # empty, while §12 of DEPLOY.md sent whoever was stuck there to read it. The
+      # file is the server's own, written beside the meta layer, so it lands in
+      # the volume the backup already takes.
+      FUNOTEKA_LOG_FILE: /data/funoteka.log
+      # The config file, for settings a person edits rather than a secret: it
+      # lives with the data, and the environment above still wins over it.
+      FUNOTEKA_CONFIG: /data/funoteka.json
+
+    ports:
+      # **The host side, and deliberately not `FUNOTEKA_PORT`.** That variable is
+      # the *server's* setting and `env_file` hands it to the container, so
+      # publishing `${FUNOTEKA_PORT}` beside it maps a port onto itself: the
+      # server moves to 4633 inside, the mapping still says 4633 -> 4533, and
+      # nothing outside can reach it. Which is what happened, and what the
+      # acceptance run caught. Inside the container the ports are 4533/4534 —
+      # the Dockerfile sets them — and these two are where the host publishes
+      # them.
+      # The Subsonic API: publish it to the network a phone is on.
+      - "${PORT:-4533}:4533"
+      # The admin surface. It has to be reachable for a restart to be a restart,
+      # and it is guarded by FUNOTEKA_ADMIN_TOKEN — put it behind a proxy with
+      # TLS, or bind it to an address that is not the open internet.
+      - "${ADMIN_PORT:-4534}:4534"
+
+    volumes:
+      # Everything this deployment owns, and the whole of what a backup takes.
+      - ${DATA:-./data}:/data
+      # The collection. Read-only, and it must be: this server never writes to
+      # the music, and a mount that cannot enforce that is a mount that will
+      # eventually find out it was wrong.
+      - ${MUSIC:?set MUSIC in .env to the collection}:/music:ro
+
+    # A first run has nothing to serve: the meta layer is created empty by the
+    # server, and the scanner fills it. Run it once by hand —
+    #   docker compose exec funoteka node src/cli.ts scan /music
+    # — or point the admin surface's `scan` at it (task:2936).
+    #
+    # Bounded logs, because a container that logs every request without a limit
+    # fills the host's disk and takes everything else down with it.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:'+(process.env.FUNOTEKA_PORT||'4533')+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3

@@ -1,0 +1,14 @@
+-- The year a box was released, which the classifier has been reading and
+-- throwing away.
+--
+-- `014_album_year.sql` gave the year a column on `album` because the folder name
+-- states it and nothing kept it. A box is the case that column cannot hold: its
+-- discs are named `CD1 ● Альбом`, `CD2 ● …` — the year is in the *box* folder's
+-- name (`1988 ● Группа крови (2019, Maschina Records, MKK881CD, 3CD)`), and the
+-- disc rows state nothing. So every record of every box came back with no year,
+-- while the name the client was shown began with one.
+--
+-- `release` is the row that owns the box folder, so the year goes here, beside
+-- the title it was parsed from. Nothing is backfilled: the next scan writes it,
+-- the same way the title is written on every run.
+ALTER TABLE release ADD COLUMN year INTEGER;

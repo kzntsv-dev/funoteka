@@ -1,0 +1,32 @@
+# What the image does not need, and mostly what it must not have.
+#
+# The build copies `src`, `deploy` and `package.json` explicitly, so this file is
+# about the *context* — what gets sent to the daemon before the build starts.
+# A checkout with a collection's worth of test fixtures and a node_modules tree
+# is hundreds of megabytes of upload for an image that contains neither.
+
+.git
+.gitignore
+node_modules
+
+# Tests and their fixtures: they belong to the repository, not to a deployment.
+test
+
+# Whatever a local run left behind. The `data` directory is what a *host* mounts
+# at /data, and an image that shipped one would be shipping somebody's library.
+data
+*.db
+*.db-wal
+*.db-shm
+*.pid
+*.log
+
+# A deployment's own settings never travel in an image.
+.env
+funoteka.json
+
+# Editor and platform noise.
+.vscode
+.idea
+.DS_Store
+Thumbs.db

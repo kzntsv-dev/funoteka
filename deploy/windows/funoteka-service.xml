@@ -1,0 +1,58 @@
+<!--
+  funoteka as a Windows service — WinSW's configuration.
+
+  Do not copy this file to the service by hand: `install-service.ps1` fills in
+  the placeholders below and installs it, because the paths it needs are the ones
+  only that script knows (where node is, where this checkout is, where the data
+  directory is).
+
+  **Every secret lives in the config file and not here.** A WinSW XML sits beside
+  the wrapped executable and is readable by whoever can read that directory,
+  while `FUNOTEKA_CONFIG` points at a file whose ACL the install script restricts
+  to the service's own account. That is the same split the systemd unit makes
+  with its `EnvironmentFile`, and for the same reason.
+
+  **`<onfailure action="restart"/>` is what makes `POST /restart` a restart.**
+  The admin surface answers 200 and exits with 75 (`EX_TEMPFAIL`), which is a
+  failure as far as this file is concerned — that is exactly why the code is not
+  0, and why the other two deployments need nothing special: Docker and systemd
+  restart on a clean exit too.
+-->
+<service>
+  <id>funoteka</id>
+  <name>funoteka</name>
+  <description>Subsonic-compatible music library — smart scanner, Subsonic API, admin surface</description>
+
+  <executable>{{NODE}}</executable>
+  <arguments>"{{REPO}}\src\cli.ts" serve</arguments>
+  <workingdirectory>{{DATA}}</workingdirectory>
+
+  <startmode>Automatic</startmode>
+  <!-- Gives the network and any mounted collection time to be there; a service
+       that starts before the disk it serves would scan an empty directory. -->
+  <delayedAutoStart>true</delayedAutoStart>
+
+  <!-- The meta layer, the log and the config, all in one directory — and the
+       only directory this service needs to write. -->
+  <env name="FUNOTEKA_CONFIG" value="{{DATA}}\funoteka.json" />
+  <env name="FUNOTEKA_DB" value="{{DATA}}\funoteka.db" />
+  <env name="FUNOTEKA_LOG_FILE" value="{{DATA}}\funoteka.log" />
+  <!-- What tells the server something will start it again — see the note above. -->
+  <env name="FUNOTEKA_SUPERVISED" value="1" />
+
+  <onfailure action="restart" delay="10 sec" />
+  <!-- A service that has restarted cleanly for an hour is no longer failing, so
+       one later crash is treated as the first. -->
+  <resetfailure>1 hour</resetfailure>
+
+  <!-- A stop waits for the sockets and the meta layer to be closed: the server
+       handles SIGTERM, and Windows delivers it to a process WinSW asks politely.
+       The timeout is the backstop for a client holding a stream open. -->
+  <stoptimeout>20 sec</stoptimeout>
+  <!-- The server spawns ffmpeg for cue segments; that child must not outlive the
+       service, and killing the parent first is what leaves it orphaned. -->
+  <stopparentprocessfirst>false</stopparentprocessfirst>
+
+  <logmode>append</logmode>
+  <logpath>{{DATA}}\logs</logpath>
+</service>

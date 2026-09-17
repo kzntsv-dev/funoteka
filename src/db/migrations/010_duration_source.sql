@@ -1,0 +1,31 @@
+-- Where an `audio_probe` length came from, measured or worked out.
+--
+-- The project's rule is that a value has to say whether it is knowledge or a
+-- guess — `title_source`, `ambiguous`, `encoding_confidence`, and
+-- `TagRead.durationRefused` are all that rule applied elsewhere. Duration was
+-- the one place it was not: `probeFile` puts ffprobe's `format.duration` into
+-- this table the same way the tag readers put the container's own statement
+-- there, and the two are not the same kind of answer.
+--
+-- They differ exactly where it matters. ffprobe reads a length when the
+-- container states one, but an mp3 that states no frame count — no Xing/Info
+-- header — leaves it nothing to read, and it derives the number from the file
+-- size and the bitrate instead. Measured on the collection's own
+-- `02. 218 Tracks.mp3`: the stored 165 778 ms is `size * 8 / bitrate` to the
+-- millisecond. That the value happens to be close to the truth does not make
+-- it a measurement, and nothing downstream could tell.
+--
+-- Two values, because two things are worth telling apart and no more:
+--
+--   'container'  the file's own bytes state it — FLAC STREAMINFO, MP4 mvhd, an
+--                mp3's stated frame count, or a walk over an mp3's frames.
+--                Everything the tag stage seeds is this.
+--   'ffprobe'    ffprobe's answer, which is a reading for some containers and
+--                a derivation for others. It is only ever reached for a file
+--                the reader could not measure, and it is named rather than
+--                judged: `tag-duration-estimated` carries the detail.
+--
+-- NULL for rows written before this column, which is honest — they were
+-- written when the distinction was not being made.
+
+ALTER TABLE audio_probe ADD COLUMN duration_source TEXT;

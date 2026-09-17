@@ -1,0 +1,14 @@
+-- Which reading of a file a probe row is.
+--
+-- A row in this table is an answer about a file *as read by a particular
+-- method*, and until now nothing in the row said which one — so a change of
+-- method left readings behind that were no longer readings, and the collection
+-- carried them as facts. (It did: `codec` was filled with the container's name
+-- rather than a codec, `mp4` and `id3v2`, for two thousand files.)
+--
+-- Zero is "a method older than the one this code reads with", which is what
+-- every row written before this migration is. `PROBE_METHOD` in
+-- `src/probe/ffprobe.ts` is the number rows carry from here on, and raising it
+-- is how a change of method is announced: every row below it stops being an
+-- answer, and the next scan takes those files again.
+ALTER TABLE audio_probe ADD COLUMN probe_method INTEGER NOT NULL DEFAULT 0;

@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Meta layer (local scan output — never committed; it points at local paths)
+*.db
+*.db-wal
+*.db-shm
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# A deployment's own config file. The server reads `funoteka.json` from the
+# working directory by DEFAULT, so one committed here would configure every
+# clone that did not ask for it — and a log path or a port from somebody's
+# machine is not a default anybody should be given.
+funoteka.json

@@ -1,0 +1,77 @@
+# funoteka as a Linux service.
+#
+#   sudo install -Dm644 deploy/systemd/funoteka.service /etc/systemd/system/funoteka.service
+#   sudo install -Dm600 deploy/systemd/funoteka.env.example /etc/funoteka/env
+#   sudo editor /etc/funoteka/env          # credentials, admin token, MUSIC path
+#   sudo useradd --system --home /var/lib/funoteka funoteka
+#   sudo systemctl daemon-reload && sudo systemctl enable --now funoteka
+#
+# The unit is written for the *native* deployment — Node and ffmpeg installed on
+# the machine. If Docker is available, `docker compose up -d` is the shorter road
+# and this file is not needed.
+#
+# **`Restart=always` is what makes `POST /restart` a restart.** The admin surface
+# answers 200 and exits; systemd is what brings it back. `FUNOTEKA_SUPERVISED=1`
+# below is the server being told so, and without both halves the route refuses
+# with a reason rather than stopping the service.
+
+[Unit]
+Description=funoteka — Subsonic-compatible music library
+Documentation=https://github.com/ (see DEPLOY.md)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=funoteka
+Group=funoteka
+WorkingDirectory=/opt/funoteka
+
+# Secrets live here and not in this unit: the file is 0600 and root-owned, while
+# a unit file is world-readable and ends up in `systemctl cat` output.
+EnvironmentFile=/etc/funoteka/env
+# What tells the server that something will start it again — see the note above.
+Environment=FUNOTEKA_SUPERVISED=1
+# **Where the config file is, and it has to be somewhere the service may write.**
+# Without this the file resolves against the working directory — `/opt/funoteka`
+# — which `ProtectSystem=strict` makes read-only, so `POST /config` and
+# `POST /user` would fail on a native deployment while working in a container.
+# The state directory below is the one place this service may write.
+Environment=FUNOTEKA_CONFIG=/var/lib/funoteka/funoteka.json
+
+# `/usr/bin/node` rather than `node`: a service does not read a login shell's
+# PATH, and a unit that silently fails to find its interpreter is a service that
+# is "not running" with nothing in the journal but an exit code.
+ExecStart=/usr/bin/node /opt/funoteka/src/cli.ts serve
+
+Restart=always
+RestartSec=5s
+
+# A stop waits for the process to close its sockets and its meta layer rather
+# than killing it: the server handles SIGTERM, and what it does with it is
+# exactly what a clean shutdown is. The timeout is the backstop for a client
+# holding a stream open.
+KillSignal=SIGTERM
+TimeoutStopSec=20s
+
+# The state directory, created and owned by systemd, and the only place under a
+# read-only filesystem this service may write. Point FUNOTEKA_DB here.
+StateDirectory=funoteka
+ReadWritePaths=/var/lib/funoteka
+
+# A server that only reads a collection and writes one directory has no use for
+# the privileges of a person. Each of these closes a way out of the service if
+# the process is ever made to do something it was not meant to.
+NoNewPrivileges=true
+ProtectSystem=strict
+# `read-only` and not `yes`: this collection frequently lives under /home, and a
+# unit that could not read it would be a service that started and served nothing.
+ProtectHome=read-only
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

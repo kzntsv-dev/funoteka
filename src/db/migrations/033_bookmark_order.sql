@@ -1,0 +1,14 @@
+-- The order bookmarks are read in, indexed.
+--
+-- `bookmark/store.ts` reads the whole table `ORDER BY changed_at DESC, track_id`
+-- — a list of where somebody stopped is a list of what they are in the middle
+-- of, and the one they last listened to is the first — and `032_bookmarks.sql`
+-- declared no index at all. So the listing sorted the table every time, which is
+-- the shape `028_annotations.sql` names for its own three tables and `029` for
+-- the ledger: a reader that orders by a column is a reader that wants it
+-- indexed.
+--
+-- `track_id` is in the index and not only in the query because SQLite has to
+-- break a tie by something, and a tie broken by a column the index does not
+-- carry is a rowid walk per equal pair.
+CREATE INDEX bookmark_changed ON bookmark (changed_at DESC, track_id);

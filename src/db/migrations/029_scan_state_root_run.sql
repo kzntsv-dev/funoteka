@@ -1,0 +1,28 @@
+-- The ledger question `current()` asks, indexed.
+--
+-- `db/ledger.ts` asks whether a ledger row was written by the run that last
+-- walked its root, and it asks by comparing that row's run against the newest
+-- one for the same root:
+--
+--   ss.last_seen_run_id = (SELECT MAX(e.last_seen_run_id) FROM scan_state e
+--                           WHERE e.root_id = ss.root_id)
+--
+-- Nothing indexed `(root_id, last_seen_run_id)` on `scan_state`, so that `MAX`
+-- read every row of the root — and the fragment is a predicate inside a lookup,
+-- not a query of its own, so it was asked once per lookup rather than once per
+-- stage. That is the whole difference: measured on the live collection, the cue
+-- stage's stored-probe lookup made **3347** calls and cost **1050 ms** of a
+-- 1756 ms stage. With this index the same stage takes **709 ms**, and the lookup
+-- no longer appears among the stage's costs at all (task:2880).
+--
+-- `folder`, `album` and `release` were given this index in 005, for the same
+-- reason — "did this run see it" is a question about the newest run for a root.
+-- `scan_state` was left out, and that cost nothing while the ledger was read
+-- once per root. It stopped being free when a stage began asking it per file:
+-- `tags` asks it to decide which files to read, and the cue stage asks it
+-- whether a stored measurement is still good.
+--
+-- The pair is the shape the question has, in that order: `root_id` is the
+-- equality, `last_seen_run_id` the aggregate — so the `MAX` is answered by the
+-- last entry of the range rather than by reading it.
+CREATE INDEX scan_state_root_run ON scan_state (root_id, last_seen_run_id);
