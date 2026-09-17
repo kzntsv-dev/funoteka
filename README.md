@@ -15,7 +15,9 @@ discs, and an image file with a cue sheet becomes real, playable tracks. Nothing
 - **Your files are never modified.** Classification, cue boundaries, encodings, dedup — all of it
   lives in a meta layer beside the server. Point it at your disk; your disk stays as it is.
 - **No LLM, no Discogs, no Last.fm, no external service.** The core reads what is in your files and
-  folders. Enrichment is possible later, and it is optional.
+  folders, and what it writes stays on your disk: the meta layer, the log, and an audit file beside
+  the database that records what was changed through the admin surface. Enrichment is possible
+  later, and it is optional.
 - **An agent installs, configures and runs it.** Hand your agent `DEPLOY.md`.
 
 A complete **Subsonic / OpenSubsonic** surface, filled from your own files wherever it can be and
@@ -50,6 +52,18 @@ Three albums, a box set of twelve discs. No merging, no guessing, nothing lost.
 
 ## Install
 
+### What it costs
+
+Measured on the machine this was built on, and worth knowing before you point it at 200 GB of FLAC:
+
+| | |
+|---|---|
+| **Idle** | about **42 MB** of RAM, no measurable CPU — the container, with an empty library |
+| **The meta layer** | **30 MB** of SQLite for 3 432 songs and 472 albums (the author's own library); it grows with the catalogue, not with the audio |
+| **The re-encode cache** | grows with what you ask for: 300 MB after a year of cue segments from m4a/MP4 images, and it is inside the one directory you mount |
+| **The collection** | read-only, never written to, never copied anywhere. The server reads the bytes it serves and does not keep the library in memory |
+| **The image** | 421 MB, ffmpeg included |
+
 ### Docker — the main path
 
 The image carries everything, **ffmpeg included** — the only external binary the server ever wants,
@@ -76,11 +90,10 @@ docker compose exec funoteka node src/cli.ts scan /music   # fill the library, o
 ### Native, without Docker
 
 Needs **Node 24+**. There are **no runtime dependencies** — Node carries SQLite and FTS5, and the
-repository runs its own TypeScript, with no build step at all. The published *package* is the one
-place that cannot hold: Node refuses to strip types from anything under `node_modules`
-(`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`, and no flag lifts it), so what npm gets is the same
-sources compiled once at release (`npm run build`) — a build that exists for the package and not for
-the repository. `ffmpeg` on the PATH is needed only for cue tracks inside an m4a/MP4 container.
+repository runs its own TypeScript with no build step at all. (The published *package* is the one
+place that cannot hold, because Node refuses to strip types from anything under `node_modules`; what
+npm gets is the same sources compiled once at release. Why, and what that changes — `DEPLOY.md` §13.)
+`ffmpeg` on the PATH is needed only for cue tracks inside an m4a/MP4 container.
 
 ```sh
 npm install -g funoteka
@@ -132,6 +145,9 @@ classification and you edit that layer, not your music.
 
 - `DEPLOY.md` — install, configure and manage, written to be read by an agent
 - The admin API and the MCP server — `DEPLOY.md` §11
+- Something broken, or missing: [an issue](https://github.com/kzntsv-dev/funoteka/issues) — say
+  what you did, what you expected and what the server said; the log and `GET /issues` usually
+  already contain the answer, and the troubleshooting table in `DEPLOY.md` has the rest
 
 ## License
 

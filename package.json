@@ -41,6 +41,7 @@
   "scripts": {
     "build": "node deploy/build.mjs",
     "prepublishOnly": "npm run build",
+    "prepare": "node deploy/build.mjs",
     "scan": "node src/cli.ts scan",
     "serve": "node src/cli.ts serve",
     "smoke": "node deploy/smoke.mjs",

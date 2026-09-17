@@ -72,15 +72,31 @@ installation (verified by running exactly this against the published image):
 MUSIC=/absolute/path/to/your/music
 docker run -d --name funoteka -p 4533:4533 -p 4534:4534 \
   -e FUNOTEKA_USER=you -e FUNOTEKA_PASSWORD=change-me \
-  -e FUNOTEKA_ADMIN_TOKEN=<the token you generated> \
+  -e FUNOTEKA_ADMIN_TOKEN=PASTE_THE_TOKEN_YOU_GENERATED \
   -e FUNOTEKA_SUPERVISED=1 -e FUNOTEKA_LOG_FILE=/data/funoteka.log \
   -v "$MUSIC":/music:ro -v funoteka-data:/data \
   --restart unless-stopped ghcr.io/kzntsv-dev/funoteka:0.1.2
 ```
 
+(The token above is a placeholder with no angle brackets in it, on purpose: a
+copy-paste that misses the substitution should fail to authenticate loudly rather
+than carry a string that looks like a token.)
+
 `FUNOTEKA_SUPERVISED=1` is what makes `POST /restart` a restart rather than a
 stop, and the restart policy beside it is what supervises the process. The first
 scan is still a command, not a startup side effect — see the end of this section.
+
+Two things that bite on a NAS, and neither is visible from the command above:
+
+- **The container runs as `node`, uid 1000.** A collection on a share that this
+  uid cannot read scans as an empty root — the server says so rather than failing
+  (`nothing here — an empty directory and a mistyped path read alike`), and the
+  fix is on the host: `chown` it, grant the group, or run the container with
+  `--user` set to the owner.
+- **The `arm64` half of the published image is built under emulation** on an
+  `amd64` machine. It runs correctly and it is not as fast as a build made on
+  that box would be — for a small board this is the difference worth measuring,
+  and `build: .` in a checkout on that box is the other path.
 
 From a checkout, the same installation is the compose file:
 
@@ -97,7 +113,7 @@ MUSIC=/absolute/path/to/your/music     # read-only into the container
 DATA=./data                            # everything the server owns
 FUNOTEKA_USER=you
 FUNOTEKA_PASSWORD=change-me
-FUNOTEKA_ADMIN_TOKEN=<the token you generated>
+FUNOTEKA_ADMIN_TOKEN=PASTE_THE_TOKEN_YOU_GENERATED
 ```
 
 Start it:
@@ -214,16 +230,21 @@ admin calls as §3 — add the root with the path **as this machine sees it**
 
 ## 5. Path C — native Windows (service)
 
+**The daemon works on Windows and is in daily use** — it is how the author's own
+server runs (started by a `start.cmd` that carries the `FUNOTEKA_*` variables
+from §3). What has not been run end to end is the *service wrapper* below, and
+its own help says so.
+
 ```powershell
 # elevated PowerShell, from the checkout
 .\deploy\windows\install-service.ps1 -Data 'C:\ProgramData\funoteka'
 ```
 
 The script downloads WinSW (pinned, hash-checked) to wrap `node src/cli.ts
-serve` as a service, writes a config file from the example, and restricts its
-ACL. **Edit that config file before starting the service** — it needs a password
-and an admin token. The script's own help says it has not been run end to end by
-whoever wrote it, and that is worth heeding: the first run is the verification.
+serve` as a service, writes the config file to `<Data>\funoteka.json` and the log
+to `<Data>\funoteka.log`, and restricts the directory's ACL. **Edit that config
+file before starting the service** — it needs a password and an admin token, and
+the service reads them from there rather than from a shell.
 
 ## 6. Verify, then keep it running
 
@@ -350,6 +371,9 @@ so inside a container the script is named instead.
 # a native install, with the bin on PATH (`npm link`, or `npm install -g .`)
 FUNOTEKA_ADMIN_TOKEN=$TOKEN funoteka mcp
 
+# or without installing anything: the published package, the same command
+FUNOTEKA_ADMIN_TOKEN=$TOKEN npx -y funoteka mcp
+
 # the container — the token arrives through .env, so it need not be repeated
 docker compose exec -T funoteka node src/cli.ts mcp
 ```
@@ -393,3 +417,26 @@ own status is in `GET /scan/history`.
 with them), then whether the song exists (`/rest/search3`), then the log with
 `FUNOTEKA_LOG_REQUESTS=1`, which prints one line per request with the method and
 the query — masked, because a client spells its password there.
+
+## 13. Why the published package is built, and the repository is not
+
+The repository runs its own TypeScript: `node src/cli.ts` is the program, `npm
+test` is the suite, and there is no build step to run before either of them.
+
+**The npm package cannot do that**, and the reason is a rule rather than a
+preference: Node refuses to strip types from any file under `node_modules`
+(`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`), and no flag lifts it — checked on
+v24.19.0 with the default, both `--experimental-strip-types` and
+`--experimental-transform-types`, and the two together. A `bin` that named a `.ts`
+file would install a package that cannot start.
+
+So `npm run build` compiles `src` into `dist` for the package only
+(`tsconfig.build.json`, `deploy/build.mjs`), copying the schema migrations
+beside the code that reads them, and `bin` names `dist/cli.js`. Two consequences
+worth knowing:
+
+- **A fresh checkout has no `dist/`** and therefore no `funoteka` bin until the
+  build runs. `npm install` in a checkout now runs it (`prepare`), so
+  `npm link` from a clone works; `git clone` without an install does not.
+- **The image still copies `src/`** and runs `node src/cli.ts serve` — the
+  container is a checkout, and it never needs the build.
