@@ -9,11 +9,11 @@ name: CI
 #
 # `publishable` — the values and the meta that must not be in a copy that leaves
 # the private development tree. The gate checks the values **by value**, and the
-# identifiers of this estate are not in this repository: they arrive from the
-# repository secret `FUNOTEKA_PRIVATE_VALUES` (comma-separated). **The job fails
-# on purpose when the secret is absent** — a green verdict from a gate that did
-# not look for the hostname, the LAN and the handle is worse than a red check, so
-# the gate exits 2 rather than pretending. See `deploy/check-publishable.mjs`.
+# identifiers of this estate are not in this repository — this repository holds
+# no secrets at all, on purpose. So CI runs the check that needs nothing private
+# (shapes and meta) and says so in its verdict, while the full check runs at
+# release time against the copy, where the identifiers legitimately live. See
+# `deploy/check-publishable.mjs`.
 #
 # `image` — the Dockerfile is the first thing a stranger runs, and it is built on
 # the machine that runs it (there is no cross-build and no published image yet).
@@ -46,8 +46,27 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      # **This repository holds no secrets, and that is deliberate.** The sibling
+      # public repository has none either, and it publishes to PyPI through OIDC
+      # rather than a token; the identifiers of the private estate do not become
+      # a repository secret just to be looked for. So the check here is the part
+      # that needs nothing private — the shapes and the meta — and its verdict
+      # says which check it is ("SHAPES ONLY"), instead of a green that would
+      # read as a full one.
+      #
+      # The full check, with the estate's own identifiers, runs where they live:
+      # at release time, from the development checkout, against the curated copy
+      # before it is published (`FUNOTEKA_PRIVATE_VALUES` from a file outside
+      # every repository). If this repository ever gains that secret, the step
+      # below upgrades itself to the full check with no other change.
       - name: the gate
-        run: node deploy/check-publishable.mjs .
+        run: |
+          if [ -n "$FUNOTEKA_PRIVATE_VALUES" ]; then
+            node deploy/check-publishable.mjs .
+          else
+            echo 'no FUNOTEKA_PRIVATE_VALUES here — checking the shapes and the meta, and saying so'
+            node deploy/check-publishable.mjs . --shapes-only
+          fi
         env:
           FUNOTEKA_PRIVATE_VALUES: ${{ secrets.FUNOTEKA_PRIVATE_VALUES }}
 
