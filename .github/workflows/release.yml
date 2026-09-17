@@ -85,6 +85,11 @@ jobs:
     needs: image
     steps:
       - uses: actions/checkout@v4
+      # The CLI this job runs needs the Node the package asks for: `node:sqlite`
+      # and `import.meta.dirname` are not in whatever the runner happens to ship.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - name: the image the tag names answers /health
         run: |
           set -euo pipefail
@@ -104,6 +109,13 @@ jobs:
           fi
           docker rm -f released
       - name: the package the tag names is the one npm has
+        # **Not from the checkout.** `npx` resolves a bin from the directory it
+        # runs in first, and this project's own name is `funoteka` — so a check
+        # run from the repository root asks the checkout for a bin it has not
+        # installed and reports `funoteka: not found` about a package that is
+        # published and fine. Cost one red run; reproduced by hand from an empty
+        # directory, where the same command works.
+        working-directory: ${{ runner.temp }}
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
