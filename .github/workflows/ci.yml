@@ -1,0 +1,59 @@
+name: CI
+
+# Three things, and each one is a way the repository can lie about itself.
+#
+# `tests` — the suite runs on the version of Node the package asks for, from a
+# clean checkout, with the lock file's versions rather than whatever `^` resolves
+# to today. On a machine that has never run this project, which is the only
+# machine that can tell you whether `npm ci` works.
+#
+# `publishable` — the values and the meta that must not be in a copy that leaves
+# the private development tree. The gate checks the values **by value**, and the
+# identifiers of this estate are not in this repository: they arrive from the
+# repository secret `FUNOTEKA_PRIVATE_VALUES` (comma-separated). **The job fails
+# on purpose when the secret is absent** — a green verdict from a gate that did
+# not look for the hostname, the LAN and the handle is worse than a red check, so
+# the gate exits 2 rather than pretending. See `deploy/check-publishable.mjs`.
+#
+# `image` — the Dockerfile is the first thing a stranger runs, and it is built on
+# the machine that runs it (there is no cross-build and no published image yet).
+# Building it here is the check; nothing is pushed from this workflow.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    name: tests (Node 24)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  publishable:
+    name: publishable (no private values, no meta)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: the gate
+        run: node deploy/check-publishable.mjs .
+        env:
+          FUNOTEKA_PRIVATE_VALUES: ${{ secrets.FUNOTEKA_PRIVATE_VALUES }}
+
+  image:
+    name: image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t funoteka:ci .
