@@ -15,7 +15,7 @@ services:
     #
     # With no checkout to build from, swap those two lines — drop `build:` and
     # put the published image here instead:
-    #   image: ghcr.io/kzntsv-dev/funoteka:0.1.1
+    #   image: ghcr.io/kzntsv-dev/funoteka:0.1.2
     # (`linux/amd64` and `linux/arm64` in one manifest.)
     build: .
     image: funoteka:latest

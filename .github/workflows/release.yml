@@ -105,7 +105,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: the image this version names answers /health
+      - name: the image this version names answers /health — with this version
         env:
           VERSION: ${{ inputs.version || github.ref_name }}
         run: |
@@ -116,12 +116,24 @@ jobs:
           docker run -d --name released -p 4533:4533 \
             -e FUNOTEKA_USER=verify -e FUNOTEKA_PASSWORD=verify "$image"
           for _ in $(seq 1 30); do
-            if curl -fsS -m 3 http://127.0.0.1:4533/health; then started=1; break; fi
+            if curl -fsS -m 3 http://127.0.0.1:4533/health -o /tmp/answer.json; then started=1; break; fi
             sleep 2
           done
           if [ "${started:-0}" != 1 ]; then
             docker logs released
-            echo "the image the tag names never answered /health"
+            echo "the image this release names never answered /health"
+            exit 1
+          fi
+          cat /tmp/answer.json
+          # **The version it answers with is the version that was released.** The
+          # bump and the constant that feeds every Subsonic envelope are two
+          # places, and the test that pins them together runs in the suite — but
+          # nothing here looked at the artefact, so `0.1.1` shipped an image whose
+          # `/health` said `0.1.0`. A puller cannot tell two releases apart by
+          # anything else.
+          reported=$(python3 -c 'import json; print(json.load(open("/tmp/answer.json"))["version"])')
+          if [ "$reported" != "$version" ]; then
+            echo "the image answers version ${reported}, and this release is ${version}"
             exit 1
           fi
           docker rm -f released

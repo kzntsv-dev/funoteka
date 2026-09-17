@@ -49,6 +49,11 @@ test('the identity fields travel in both formats', () => {
 
   const xml = render(ok(), parseFormat(null)).body;
   assert.match(xml, /type="funoteka"/);
-  assert.match(xml, /serverVersion="0\.1\.0"/);
+  // The constant, not a literal: this test is about a field travelling in both
+  // formats, and the value itself is pinned to `package.json` in the test above.
+  // A literal here is a test every release has to remember to edit — and the
+  // release that does not is a red suite about the wrong thing (which is how
+  // `0.1.1` was tagged while CI was failing).
+  assert.ok(xml.includes(`serverVersion="${SERVER_VERSION}"`), xml);
   assert.match(xml, /openSubsonic="true"/);
 });

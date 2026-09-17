@@ -9,6 +9,22 @@ The version lives in exactly one place — `package.json`.
 
 _(nothing yet)_
 
+## [0.1.2] — 2026-09-17
+
+### Fixed
+
+- **The version the server reports is now the version it is.** `0.1.1`'s image and
+  package both answered `0.1.0` on `/health` and in every Subsonic envelope,
+  because the version lives in a constant (`SERVER_VERSION`) that a test pins to
+  `package.json` — and the bump to `0.1.1` raised the manifest and left the
+  constant behind. **That test failed, and `0.1.1` was tagged while CI was red**,
+  which is the more serious half of this: the pipeline was watching the artefacts
+  and nobody was watching the pipeline. The constant is corrected, and the release
+  job now fails when the image it pulls answers with a version other than the one
+  the release is about — a check that can fail is what would have caught it.
+- Nothing else changed: the same program as `0.1.0` and `0.1.1`, and the same
+  schema.
+
 ## [0.1.1] — 2026-09-17
 
 ### Fixed
