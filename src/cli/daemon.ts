@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { closeSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { extname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+
+import { entryPoint } from './entry.ts';
 
 /**
  * The server, running on its own.
@@ -157,9 +157,9 @@ export async function start(dbPath: string, argv: string[], timeoutMs = 15_000):
   const log = openSync(logPath(dbPath), 'a');
   const child = spawn(
     process.execPath,
-    // The entry point as this build spells it — `.ts` beside the sources, `.js`
-    // in the compiled build the npm package ships (see `cli.ts`).
-    [fileURLToPath(new URL(`../cli${extname(import.meta.filename)}`, import.meta.url)), 'serve', ...argv],
+    // The entry point as *this* build spells it — `.ts` beside the sources, `.js`
+    // in the compiled build the npm package ships (see `cli/entry.ts`).
+    [entryPoint('../cli'), 'serve', ...argv],
     {
       detached: true,
       // Nothing on stdin: a daemon that could read a terminal would be waiting

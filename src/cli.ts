@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 import type { Server } from 'node:http';
-import { extname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { createServer } from './api/server.ts';
 import { createAdminServer } from './api/admin.ts';
@@ -31,6 +29,7 @@ import { listRoots } from './api/roots.ts';
 import { scanner } from './api/scanner.ts';
 import { resolveCommand } from './cli/args.ts';
 import { claim, logPath, logSize, release, running, start, stop } from './cli/daemon.ts';
+import { entryPoint } from './cli/entry.ts';
 import { addKey, addedKey, reportKeys, revokedKey, revokeKey } from './cli/keys.ts';
 import { openDb, type DatabaseSync } from './db/index.ts';
 import { inventory } from './inventory/inventory.ts';
@@ -569,13 +568,9 @@ function listen(
     command: (mode) => ({
       file: process.execPath,
       args: [
-        // The entry point as *this* build spells it: `.ts` in the repository,
-        // where Node strips the types itself, and `.js` in the compiled build
-        // the npm package ships — Node refuses to strip types from anything
-        // under `node_modules`, so a name hard-coded to `.ts` would work here
-        // and fail there, which is the one place the difference is invisible
-        // until somebody runs it.
-        fileURLToPath(new URL(`./cli${extname(import.meta.filename)}`, import.meta.url)),
+        // The entry point as *this* build spells it — `.ts` beside the sources,
+        // `.js` in the compiled build the npm package ships (see `cli/entry.ts`).
+        entryPoint('./cli'),
         'scan',
         ...listRoots(db).map((one) => one.path),
         '--db',

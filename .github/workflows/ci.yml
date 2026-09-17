@@ -78,7 +78,7 @@ jobs:
       - name: the tarball carries the build and not the meta
         run: |
           tar -tzf funoteka-*.tgz | grep -qx 'package/dist/cli.js'
-          tar -tzf funoteka-*.tgz | grep -q '^package/dist/db/migrations/'
+          test "$(tar -tzf funoteka-*.tgz | grep -c '^package/dist/db/migrations/')" -ge 1
           if tar -tzf funoteka-*.tgz | grep -Eq 'package/(AGENTS\.md|CLAUDE\.md|\.mappa|\.pi/|\.wiki|\.tasks)|\.ts$'; then
             echo 'the package carries the development tree or unbuilt sources:'
             tar -tzf funoteka-*.tgz | grep -E 'AGENTS|CLAUDE|\.mappa|\.pi/|\.wiki|\.tasks|\.ts$'

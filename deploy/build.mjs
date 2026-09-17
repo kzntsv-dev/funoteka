@@ -18,20 +18,37 @@
  * published artifact therefore carries what `tsc` emits, and this is how it is
  * made.
  *
- * Two steps, because `tsc` emits TypeScript and the program also reads `.sql`:
- * the schema migrations live beside the code that applies them
- * (`src/db/migrations`, found through `import.meta.dirname`), so they are copied
- * to the same place under `dist`. A build that compiled the code and left the
- * schema behind would produce a package that starts and then cannot open a
- * database.
+ * Two steps, because `tsc` emits TypeScript and the program also reads files
+ * that are not: the schema migrations live beside the code that applies them
+ * (`src/db/migrations`, found through `import.meta.dirname`). Every such file is
+ * copied to the same place under `dist` — every one, not the migrations
+ * specifically, so that a `.json` added tomorrow travels without anyone
+ * remembering to extend this script — and then the copy is *checked* rather than
+ * assumed. A build that compiled the code and left an asset behind would produce
+ * a package that starts and then fails somewhere deeper, which is the kind of
+ * failure that reads as a bug in the program.
  *
- * Exit code 0 on a complete build, 1 otherwise. The last thing it does is check
- * that the two things a run needs are where a run looks for them.
+ * Exit code 0 on a complete build, 1 otherwise.
  */
 
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
+
+/** Every file under `src` that is not TypeScript, as a path relative to `src`. */
+function assets(dir = 'src') {
+  const found = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const from = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      found.push(...assets(from));
+      continue;
+    }
+    if (entry.name.endsWith('.ts')) continue;
+    found.push(relative('src', from));
+  }
+  return found.sort();
+}
 
 const tsc = join('node_modules', 'typescript', 'bin', 'tsc');
 if (!existsSync(tsc)) {
@@ -47,30 +64,25 @@ if (compiled.status !== 0) {
   process.exit(1);
 }
 
-/** Every file under `src` that is not TypeScript, at the same relative path. */
-function copyAssets(dir) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const from = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      copyAssets(from);
-      continue;
-    }
-    if (entry.name.endsWith('.ts')) continue;
-    const to = join('dist', relative('src', from));
-    mkdirSync(join(to, '..'), { recursive: true });
-    cpSync(from, to);
-  }
+const carried = assets();
+for (const one of carried) {
+  const to = join('dist', one);
+  mkdirSync(dirname(to), { recursive: true });
+  cpSync(join('src', one), to);
 }
-copyAssets('src');
 
 const entry = join('dist', 'cli.js');
-const migrations = join('dist', 'db', 'migrations');
-const built = existsSync(migrations) ? readdirSync(migrations).length : 0;
-const expected = readdirSync(join('src', 'db', 'migrations')).length;
-const size = existsSync(entry) ? statSync(entry).size : 0;
+const entrySize = existsSync(entry) ? statSync(entry).size : 0;
+const missing = carried.filter((one) => !existsSync(join('dist', one)));
+const schema = carried.filter((one) => one.endsWith('.sql'));
 
-console.log(`dist/cli.js ${size} bytes, ${built}/${expected} migration(s) beside it`);
-if (size === 0 || built !== expected) {
-  console.error('the build is not complete: the entry point or the schema is missing');
+console.log(`dist/cli.js ${entrySize} bytes, ${carried.length - missing.length}/${carried.length} asset(s) beside it`);
+if (entrySize === 0 || missing.length > 0) {
+  for (const one of missing) console.error(`  not in dist: ${one}`);
+  console.error('the build is not complete: the entry point or a file the program reads is missing');
+  process.exit(1);
+}
+if (schema.length === 0) {
+  console.error('no schema migrations under src — a package without them could not open a database');
   process.exit(1);
 }
