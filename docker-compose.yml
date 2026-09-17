@@ -69,6 +69,9 @@ services:
     # server, and the scanner fills it. Run it once by hand —
     #   docker compose exec funoteka node src/cli.ts scan /music
     # — or point the admin surface's `scan` at it (task:2936).
+    # On Windows with Git Bash, prefix that command with MSYS_NO_PATHCONV=1: the
+    # shell rewrites `/music` into a Windows path before Docker ever sees it, and
+    # the scan then reports an empty root at /app/C:/Program Files/Git/music.
     #
     # Bounded logs, because a container that logs every request without a limit
     # fills the host's disk and takes everything else down with it.

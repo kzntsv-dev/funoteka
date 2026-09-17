@@ -59,7 +59,13 @@ and only for cue tracks inside an m4a/MP4 container.
 git clone https://github.com/kzntsv-dev/funoteka && cd funoteka
 cp .env.example .env        # your music folder, a password, an admin token
 docker compose up -d
+docker compose exec funoteka node src/cli.ts scan /music   # fill the library, once
 ```
+
+> **On Windows with Git Bash**, prefix that last line with `MSYS_NO_PATHCONV=1`. The shell
+> rewrites `/music` into a Windows path before Docker ever sees it, and the scan then answers
+> honestly about an empty root — `/app/C:/Program Files/Git/music` — which reads like a broken
+> image and is really the shell.
 
 ### Or let your agent do it
 

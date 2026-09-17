@@ -356,6 +356,7 @@ Every one of these is a sentence this server actually says.
 | `the admin TLS certificate or key could not be read: …` | The path in the sentence. Both or neither. |
 | `no roots are configured — POST /roots adds one` | A scan was asked for before the collection was added. |
 | `not a directory on this machine: /music` | The path the *server* sees — inside the container, not on the host. |
+| a root scans as empty, and the path in the report is `/app/C:/Program Files/Git/music` | Git Bash on Windows rewrote `/music` into a Windows path before Docker saw it. Prefix the command with `MSYS_NO_PATHCONV=1`. |
 | `no such file (or segment) in this library` | A restore named a song this library does not have. The file moved, or the root is different. |
 | `that is not an export document` | `POST /restore` wants the object `GET /export` answered with. |
 | `funoteka.json is not JSON: …` | The config file is broken and the command stopped rather than coming up on defaults beside it. |
