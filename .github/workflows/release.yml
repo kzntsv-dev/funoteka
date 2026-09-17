@@ -22,6 +22,19 @@ on:
   push:
     tags:
       - 'v*'
+  # **A way to verify a version that is already published.** The first two
+  # releases of this project each taught this file something, and both times the
+  # tag-triggered run is the only one that can show it: a re-run uses the workflow
+  # as of the tagged commit, and a tag is never rewritten. Dispatching on the
+  # default branch runs *this* version of the file against a version that exists —
+  # the gate still has to pass, and the npm check still has to find the version,
+  # so it cannot publish anything that is not already published.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The version to verify (e.g. 0.1.1). The tag it was released from, without the v.'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -63,9 +76,11 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: the version the tag names
+      - name: the version this run is about
         id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          version="${{ inputs.version || github.ref_name }}"
+          echo "version=${version#v}" >> "$GITHUB_OUTPUT"
       # Both platforms in one manifest, so `docker pull` answers the machine that
       # asks — a NAS, a VDS or a laptop — with the same command. The arm64 leg
       # runs under emulation here, which the CHANGELOG states as a limitation
@@ -90,10 +105,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: the image the tag names answers /health
+      - name: the image this version names answers /health
+        env:
+          VERSION: ${{ inputs.version || github.ref_name }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
+          version="${VERSION#v}"
           image="ghcr.io/${GITHUB_REPOSITORY}:${version}"
           docker pull "$image"
           docker run -d --name released -p 4533:4533 \
@@ -108,20 +125,37 @@ jobs:
             exit 1
           fi
           docker rm -f released
-      - name: the package the tag names is the one npm has
+      - name: the package this version names is the one npm has
         # **Not from the checkout.** `npx` resolves a bin from the directory it
         # runs in first, and this project's own name is `funoteka` — so a check
         # run from the repository root asks the checkout for a bin it has not
         # installed and reports `funoteka: not found` about a package that is
         # published and fine. Cost one red run; reproduced by hand from an empty
         # directory, where the same command works.
+        env:
+          VERSION: ${{ inputs.version || github.ref_name }}
         working-directory: ${{ runner.temp }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          # The tag names a version, and this asks the registry for it — not for
-          # "a" version. A release whose package was never published fails here,
-          # which is the point of putting the check in the release and not in the
-          # runbook step that was supposed to remember.
-          npm view "funoteka@${version}" version
-          npx -y "funoteka@${version}" --help > /dev/null
+          version="${VERSION#v}"
+          # **The version's own document, and a bounded wait, because npm's is
+          # served from a CDN.** `npm view funoteka@<version>` reads the document
+          # that lists every version, and a version published a minute ago is not
+          # in that cache yet — the first run of this job failed with `404 No
+          # match found for version 0.1.1` about a version that had been published
+          # forty seconds earlier. The per-version document cannot be stale,
+          # because it did not exist before; the same lesson the sibling
+          # repository paid for on PyPI. `npx` still reads the cached one, so the
+          # wait is around both, bounded, and a version that is genuinely missing
+          # still fails here.
+          for attempt in $(seq 1 12); do
+            if curl -fsS "https://registry.npmjs.org/funoteka/${version}" > /dev/null \
+               && npx -y "funoteka@${version}" --help > /dev/null; then
+              echo "funoteka@${version} is on the registry and runs"
+              exit 0
+            fi
+            echo "attempt ${attempt}: funoteka@${version} is not visible yet — waiting"
+            sleep 15
+          done
+          echo "funoteka@${version} is still not installable three minutes after the check started"
+          exit 1
