@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import type { Server } from 'node:http';
+import { extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createServer } from './api/server.ts';
@@ -568,7 +569,13 @@ function listen(
     command: (mode) => ({
       file: process.execPath,
       args: [
-        fileURLToPath(new URL('./cli.ts', import.meta.url)),
+        // The entry point as *this* build spells it: `.ts` in the repository,
+        // where Node strips the types itself, and `.js` in the compiled build
+        // the npm package ships — Node refuses to strip types from anything
+        // under `node_modules`, so a name hard-coded to `.ts` would work here
+        // and fail there, which is the one place the difference is invisible
+        // until somebody runs it.
+        fileURLToPath(new URL(`./cli${extname(import.meta.filename)}`, import.meta.url)),
         'scan',
         ...listRoots(db).map((one) => one.path),
         '--db',

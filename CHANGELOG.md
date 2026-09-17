@@ -84,6 +84,10 @@ folders happen to be laid out is not a question a client ever has to care about.
 - A configuration file in four layers — defaults → file → environment →
   flag — where an unknown key or an unparsable file stops the command instead
   of starting a server that only looks configured.
+- **An npm package**: `npx -y funoteka mcp` starts the MCP server against a running
+  funoteka, and the same package carries the CLI (`scan`, `serve`, `stop`, `status`).
+  Node refuses to strip types from anything under `node_modules`, so the package ships
+  the sources compiled once at release — the repository itself still needs no build.
 - Daemon mode with `status` and `stop`, a pid file that is checked against the
   OS rather than believed, and `DEPLOY.md`.
 

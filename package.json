@@ -1,7 +1,6 @@
 {
   "name": "funoteka",
   "version": "0.1.0",
-  "private": false,
   "description": "Subsonic-compatible server: smart music library — scanner-classifier, cue splitting, meta layer, virtual tree",
   "license": "MIT",
   "type": "module",
@@ -9,14 +8,45 @@
     "node": ">=24.0.0"
   },
   "bin": {
-    "funoteka": "./src/cli.ts"
+    "funoteka": "./dist/cli.js"
   },
+  "files": [
+    "dist",
+    "deploy",
+    "README.md",
+    "DEPLOY.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    ".env.example",
+    "funoteka.json.example"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kzntsv-dev/funoteka.git"
+  },
+  "homepage": "https://github.com/kzntsv-dev/funoteka",
+  "bugs": {
+    "url": "https://github.com/kzntsv-dev/funoteka/issues"
+  },
+  "keywords": [
+    "subsonic",
+    "opensubsonic",
+    "music",
+    "music-server",
+    "flac",
+    "cue",
+    "mcp",
+    "self-hosted"
+  ],
   "scripts": {
+    "build": "node deploy/build.mjs",
+    "prepublishOnly": "npm run build",
     "scan": "node src/cli.ts scan",
     "serve": "node src/cli.ts serve",
     "smoke": "node deploy/smoke.mjs",
     "test": "node --test \"test/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:publishable": "node deploy/check-publishable.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

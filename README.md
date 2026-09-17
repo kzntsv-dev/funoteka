@@ -75,9 +75,12 @@ docker compose exec funoteka node src/cli.ts scan /music   # fill the library, o
 
 ### Native, without Docker
 
-Needs **Node 24+**. There are **no runtime dependencies** — Node carries SQLite, FTS5 and the
-TypeScript runtime, and there is no build step (TypeScript is a dev-time tool only). `ffmpeg` on the
-PATH is needed only for cue tracks inside an m4a/MP4 container.
+Needs **Node 24+**. There are **no runtime dependencies** — Node carries SQLite and FTS5, and the
+repository runs its own TypeScript, with no build step at all. The published *package* is the one
+place that cannot hold: Node refuses to strip types from anything under `node_modules`
+(`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`, and no flag lifts it), so what npm gets is the same
+sources compiled once at release (`npm run build`) — a build that exists for the package and not for
+the repository. `ffmpeg` on the PATH is needed only for cue tracks inside an m4a/MP4 container.
 
 ```sh
 npm install -g funoteka

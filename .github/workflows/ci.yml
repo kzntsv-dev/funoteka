@@ -57,3 +57,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t funoteka:ci .
+
+  package:
+    name: package builds, installs and starts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm pack
+      # The two ways this artifact can be wrong, and neither one is visible from
+      # its size. It can carry sources that cannot run — Node refuses to strip
+      # types from anything under `node_modules`, which is why there is a build
+      # at all — and it can carry the development tree, which is what a manifest
+      # with no `files` field did: 119 meta files, found by packing it.
+      - name: the tarball carries the build and not the meta
+        run: |
+          tar -tzf funoteka-*.tgz | grep -qx 'package/dist/cli.js'
+          tar -tzf funoteka-*.tgz | grep -q '^package/dist/db/migrations/'
+          if tar -tzf funoteka-*.tgz | grep -Eq 'package/(AGENTS\.md|CLAUDE\.md|\.mappa|\.pi/|\.wiki|\.tasks)|\.ts$'; then
+            echo 'the package carries the development tree or unbuilt sources:'
+            tar -tzf funoteka-*.tgz | grep -E 'AGENTS|CLAUDE|\.mappa|\.pi/|\.wiki|\.tasks|\.ts$'
+            exit 1
+          fi
+      - name: what was packed is what installs and answers
+        run: |
+          mkdir -p /tmp/packed && cd /tmp/packed
+          npm init -y > /dev/null
+          npm install "$GITHUB_WORKSPACE"/funoteka-*.tgz
+          ./node_modules/.bin/funoteka --help > /dev/null
