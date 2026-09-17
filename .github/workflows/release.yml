@@ -1,0 +1,115 @@
+name: release
+
+# A tag is a promise that three things are true at once: the copy on the public
+# repository has nothing private in it, the image the README names can be pulled
+# by anyone, and the package the README names can be installed. Each of those is
+# a job here, and each one can fail on its own — a tag that cannot be pulled is a
+# release that does not exist.
+#
+# **What is not here, and why.** npm is published before the tag, from the
+# package's own configuration: the first version of a package cannot be published
+# through trusted publishing, because the trusted publisher is configured *on* a
+# package that already exists. Until that is set up on npmjs.com and the workflow
+# switches to OIDC, the release order is "publish, then tag" — and `verify` fails
+# loudly if the tag names a version npm has never heard of, which is the ordering
+# being checked rather than trusted.
+#
+# GitHub credentials: none are stored. The image is pushed with the automatic
+# `GITHUB_TOKEN` (`packages: write`), which is the one credential Actions always
+# has and nothing outside the run can read.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: the copy this tag names is publishable
+    runs-on: ubuntu-latest
+    # **The one place the estate's identifiers are used in CI, and this is why
+    # the environment exists.** The push-and-pull CI checks the shapes and the
+    # meta and says so; the full check belongs to the release, so it runs here,
+    # in the job that can read the environment's secret and nothing else can.
+    # Without the secret the gate refuses (exit 2) rather than reporting a check
+    # it did not perform.
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: the gate, with the identifiers of this estate
+        run: node deploy/check-publishable.mjs .
+        env:
+          FUNOTEKA_PRIVATE_VALUES: ${{ secrets.FUNOTEKA_PRIVATE_VALUES }}
+
+  image:
+    name: image for linux/amd64 and linux/arm64
+    runs-on: ubuntu-latest
+    needs: gate
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: the version the tag names
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      # Both platforms in one manifest, so `docker pull` answers the machine that
+      # asks — a NAS, a VDS or a laptop — with the same command. The arm64 leg
+      # runs under emulation here, which the CHANGELOG states as a limitation
+      # rather than hiding.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository }}:latest
+
+  verify:
+    name: what was released pulls, starts and installs
+    runs-on: ubuntu-latest
+    needs: image
+    steps:
+      - uses: actions/checkout@v4
+      - name: the image the tag names answers /health
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          image="ghcr.io/${GITHUB_REPOSITORY}:${version}"
+          docker pull "$image"
+          docker run -d --name released -p 4533:4533 \
+            -e FUNOTEKA_USER=verify -e FUNOTEKA_PASSWORD=verify "$image"
+          for _ in $(seq 1 30); do
+            if curl -fsS -m 3 http://127.0.0.1:4533/health; then started=1; break; fi
+            sleep 2
+          done
+          if [ "${started:-0}" != 1 ]; then
+            docker logs released
+            echo "the image the tag names never answered /health"
+            exit 1
+          fi
+          docker rm -f released
+      - name: the package the tag names is the one npm has
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          # The tag names a version, and this asks the registry for it — not for
+          # "a" version. A release whose package was never published fails here,
+          # which is the point of putting the check in the release and not in the
+          # runbook step that was supposed to remember.
+          npm view "funoteka@${version}" version
+          npx -y "funoteka@${version}" --help > /dev/null
