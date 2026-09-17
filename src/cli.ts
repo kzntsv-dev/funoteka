@@ -570,7 +570,10 @@ function listen(
       args: [
         // The entry point as *this* build spells it — `.ts` beside the sources,
         // `.js` in the compiled build the npm package ships (see `cli/entry.ts`).
-        entryPoint('./cli'),
+        // `import.meta.url` is this module's, and it has to be passed: the name is
+        // relative to the file that *spawns*, not to the helper that resolves it
+        // (`issue:91`).
+        entryPoint('./cli', import.meta.url),
         'scan',
         ...listRoots(db).map((one) => one.path),
         '--db',

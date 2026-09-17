@@ -9,6 +9,21 @@ The version lives in exactly one place — `package.json`.
 
 _(nothing yet)_
 
+## [0.1.4] — 2026-09-17
+
+### Fixed
+
+- **The scan started from the server starts again.** `src/cli.ts` called
+  `entryPoint('./cli')` and the helper's default base was `import.meta.url`
+  evaluated *inside the helper* — so `./cli` resolved against `src/cli/`, not the
+  caller, and the scan child died with `Cannot find module '.../src/cli/cli.ts'`.
+  That killed every server-side entry to a scan: `POST /scan`, the MCP
+  `funoteka_scan_start` tool, the interval timer and the reader-change trigger.
+  The CLI scan kept working, which is why a broken published build read as a
+  deployment problem. The base is now a **required** argument to `entryPoint`
+  (forgetting it is a `TS2554`, and a path that does not exist throws), both call
+  sites name it, and the seam has tests over the exact pair the call sites use.
+
 ## [0.1.3] — 2026-09-17
 
 ### Changed

@@ -158,8 +158,10 @@ export async function start(dbPath: string, argv: string[], timeoutMs = 15_000):
   const child = spawn(
     process.execPath,
     // The entry point as *this* build spells it — `.ts` beside the sources, `.js`
-    // in the compiled build the npm package ships (see `cli/entry.ts`).
-    [entryPoint('../cli'), 'serve', ...argv],
+    // in the compiled build the npm package ships (see `cli/entry.ts`). The base
+    // is this module's own URL, because the relative name is counted from the
+    // file that spawns (`issue:91`).
+    [entryPoint('../cli', import.meta.url), 'serve', ...argv],
     {
       detached: true,
       // Nothing on stdin: a daemon that could read a terminal would be waiting

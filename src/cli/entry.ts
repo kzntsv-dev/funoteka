@@ -14,12 +14,36 @@ import { fileURLToPath } from 'node:url';
  *
  * Asking the filesystem instead of inferring the answer from the caller's own
  * extension makes it checkable rather than assumed: the emitted file is preferred
- * because a tree that has one is a built tree, the source is the fallback, and
- * neither existing names the source — so the failure reads as "the build did not
- * run" rather than as a `.js` that was never going to be there.
+ * because a tree that has one is a built tree, the source is the fallback.
+ *
+ * ## The base is the caller's, and it is a parameter rather than a default
+ *
+ * `from` has **no default on purpose.** It had one — `import.meta.url`, which
+ * reads as "here" and is evaluated *in this file*: so a caller writing
+ * `entryPoint('./cli')` from `src/cli.ts` was asking for a sibling of
+ * `src/cli/entry.ts`, and got `src/cli/cli.ts`, which does not exist. The server
+ * answered `202` to `POST /scan`, the child died on `MODULE_NOT_FOUND`, and the
+ * only trace was in the child's stderr — `issue:91`, and it reached a released
+ * image because nothing in the suite ran the command the scanner builds. A
+ * required parameter turns that from a silent wrong path into a compile error at
+ * the next call site, which is the version of this that cannot happen again.
+ *
+ * ## And a path that is not there is a throw, not a guess
+ *
+ * The first version returned the `.ts` spelling whether or not it existed, so a
+ * wrong base travelled out of here as a plausible-looking string and failed
+ * somewhere else entirely. Now the search either finds a file or says so.
  */
-export function entryPoint(relative: string, from: string | URL = import.meta.url): string {
+export function entryPoint(relative: string, from: string | URL): string {
   const emitted = fileURLToPath(new URL(`${relative}.js`, from));
   if (existsSync(emitted)) return emitted;
-  return fileURLToPath(new URL(`${relative}.ts`, from));
+
+  const source = fileURLToPath(new URL(`${relative}.ts`, from));
+  if (existsSync(source)) return source;
+
+  throw new Error(
+    `no entry point beside ${fileURLToPath(from)}: neither ${emitted} nor ${source} exists. ` +
+      `A relative name is resolved against the base the caller passes, so a base that is not ` +
+      `the calling module's own URL looks in the wrong directory.`,
+  );
 }
