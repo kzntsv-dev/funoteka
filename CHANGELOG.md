@@ -9,6 +9,21 @@ The version lives in exactly one place — `package.json`.
 
 _(nothing yet)_
 
+## [0.1.1] — 2026-09-17
+
+### Fixed
+
+- **The release pipeline verifies the package from outside the checkout, and on
+  the Node the package asks for.** `npx funoteka@<version>` run in the repository
+  root resolves the bin from the project it happens to stand in — whose own name
+  is `funoteka` — and reported `funoteka: not found` about a package that
+  publishes and installs fine; and the check ran on whatever Node the runner
+  ships, while the CLI needs `node:sqlite`. **No server code changed in this
+  patch:** `0.1.0` and `0.1.1` are the same program, and the image and the package
+  of `0.1.0` are published and verified. This is the release that proves the
+  pipeline end to end, taken as a patch because a tag whose verification is red
+  is not a release.
+
 ## [0.1.0] — 2026-09-17
 
 First public release. A Subsonic-compatible server that reads whatever is on
