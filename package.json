@@ -11,6 +11,7 @@
     "funoteka": "./dist/cli.js"
   },
   "files": [
+    "assets/logo",
     "dist",
     "deploy",
     "README.md",

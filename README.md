@@ -1,5 +1,10 @@
 # funoteka
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo/png/funoteka-light-256.png">
+  <img alt="funoteka" src="assets/logo/png/funoteka-256.png" width="88">
+</picture>
+
 **The Subsonic server a real collection deserves.**
 
 > ## Give `DEPLOY.md` to your agent.
