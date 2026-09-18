@@ -509,10 +509,26 @@ test('a cue album is as many songs as the cue has tracks, each from the one imag
       album.song.map((song: { duration: number }) => song.duration),
       [5, 1, 6],
     );
+    // **Three songs off one file, three different paths** (issue:100).
+    //
+    // A client with an offline cache keys a song by its path — Symfonium's own
+    // rule is *"songs with the same file are supposed to be the same song"* —
+    // so the twelve songs of a cut record that all named the image were twelve
+    // songs the client folded into one and played over and over. The path still
+    // names the image, because that is the file the bytes come from; the cut
+    // number is what makes it this song's own path.
     assert.deepEqual(
       album.song.map((song: { path: string }) => song.path),
-      Array(3).fill(`${ROOT}/Tool/Lateralus/image.flac`),
-      'one image, three songs on it',
+      [1, 2, 3].map((n) => `${ROOT}/Tool/Lateralus/image (track ${n}).flac`),
+      'one image, three songs on it, each with its own path',
+    );
+
+    // And the other half of the contract: a song that is the whole file keeps
+    // the file's one and only path. Nothing of this reaches an album of files.
+    assert.equal(
+      new Set(album.song.map((song: { path: string }) => song.path)).size,
+      3,
+      'no two songs of one record share a path',
     );
     assert.equal(album.duration, 12, "the album's length is its songs', not the file's");
     db.close();

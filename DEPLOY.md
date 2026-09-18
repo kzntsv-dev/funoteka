@@ -61,7 +61,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ## 3. Path A — Docker (main path)
 
 Works the same on a laptop, a NAS and a VDS. There is a **published image** —
-`ghcr.io/kzntsv-dev/funoteka:0.1.4`, `linux/amd64` and `linux/arm64` in one
+`ghcr.io/kzntsv-dev/funoteka:0.1.5`, `linux/amd64` and `linux/arm64` in one
 manifest — and `build: .` still builds on the machine that runs it (that is the
 path where a published image is not wanted or not reachable).
 
@@ -75,7 +75,7 @@ docker run -d --name funoteka -p 4533:4533 -p 4534:4534 \
   -e FUNOTEKA_ADMIN_TOKEN=PASTE_THE_TOKEN_YOU_GENERATED \
   -e FUNOTEKA_SUPERVISED=1 -e FUNOTEKA_LOG_FILE=/data/funoteka.log \
   -v "$MUSIC":/music:ro -v funoteka-data:/data \
-  --restart unless-stopped ghcr.io/kzntsv-dev/funoteka:0.1.4
+  --restart unless-stopped ghcr.io/kzntsv-dev/funoteka:0.1.5
 ```
 
 (The token above is a placeholder with no angle brackets in it, on purpose: a

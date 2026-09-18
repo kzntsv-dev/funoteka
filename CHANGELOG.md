@@ -9,6 +9,42 @@ The version lives in exactly one place — `package.json`.
 
 _(nothing yet)_
 
+## [0.1.5] — 2026-09-18
+
+### Fixed
+
+- **A song cut out of an image answers with a path of its own.** Every song of a
+  cue-split record is cut from the one image, so all twelve songs of
+  `Czesslove — Breakstorm (2004)` answered with the image's path — and Symfonium
+  keys a song by its file (*"songs with the same file are supposed to be the same
+  song"*), so it played the record as one song: the first track, twelve times,
+  and scrobbled it (measured on the installed instance: `tr-858` with
+  `playCount` 3 while the player showed `tr-860`). The path is still the image's,
+  because that is the file the bytes come from, plus the cut number before the
+  extension — `… - Breakstorm (track 3).flac`. The number is the track's
+  `ordinal`, which the schema keys `UNIQUE (album_id, ordinal)` on and no rescan
+  moves, so two songs of one image can never share a path by accident. This one
+  line reached **1 789 songs of 167 records** in the operator's collection, every
+  one of which a client had been told was the same song.
+- **The smoke step that watches cuts no longer looks for the defect.** It found a
+  cue-split record by songs of one record sharing a path — which is now the
+  defect itself, so it would have passed a regressed build and skipped a fixed
+  one, silently, the way it once skipped over `size`. It now finds its record by
+  the image a song is cut from and asserts the fix: every song carries a cut
+  number of its own, and it is the number the record gives the song. `size`
+  absent for a cut is now reported instead of compared (`undefined * 1.5` is
+  `NaN`, so the promise went unchecked in silence).
+
+### Changed
+
+- The `size` of a cut song is still an estimate — the exact length is a number
+  nothing holds without walking the image's frames — but its documentation no
+  longer claims 0.8 % accuracy from a single measurement. Measured on two cuts it
+  is 0.8 % low on one and **13 % high** on the other (42 637 432 promised against
+  37 735 326 served for `tr-858`), and the true total is on `stream`'s own answer.
+  Dropping the field was considered and turned down: `size` absent surprises more
+  clients than `size` 13 % high.
+
 ## [0.1.4] — 2026-09-17
 
 ### Fixed

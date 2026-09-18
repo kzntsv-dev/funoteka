@@ -318,28 +318,62 @@ await step('a whole file is rangeable, which is how seeking works', async () => 
 });
 
 await step('a track cut out of an image is served as a track, and says so', async () => {
-  // Found rather than guessed at: several songs of one record that name **the
-  // same file**. A cue-split record is the only shape that looks like that —
-  // every other song is its own file.
+  // **How a song cut out of an image says so** (issue:100): the image's own
+  // path with the cut number before the extension — `image (track 3).flac`.
+  // One spelling living in two places (`browse.ts`'s `songPathOf` and here), so
+  // a change in either has to be made in both: this step reads the path to find
+  // a cut record at all.
+  const CUT = / \(track (\d+)\)(\.[^./\\]+)?$/;
+
+  // Found rather than guessed at: several songs of one record naming **the same
+  // image**. A cue-split record is the only shape that looks like that — every
+  // other song is its own file.
   //
-  // The detector used to look for songs of one record that all reported *the
-  // image's size*, which was the same fact seen through a defect: `size` is the
-  // song's length, and answering with the file's is what this step exists to
-  // catch one field over (`9b91ccf`). It skipped honestly for a day, and the
-  // skip is why the change was noticed in the smoke at all.
+  // The detector used to look for songs of one record reporting *the image's
+  // size*, which was the same fact seen through a defect: `size` is the song's
+  // length, and answering with the file's is what this step exists to catch one
+  // field over (`9b91ccf`). Then it looked for songs of one record reporting
+  // the same **path** — which is now the defect itself, so the record is found
+  // by the image a song is cut from: its path with the cut number taken back
+  // out. That answers for a fixed library and for a regressed one (where the
+  // number is gone and every song of the image is back to one path), which is
+  // what keeps this step from going quietly `skipped` the way it did over
+  // `size` (`9b91ccf`).
   const page = await api('search3', { query: '', songCount: 500 });
-  const byAlbum = new Map();
+  const images = new Map();
   for (const song of page.searchResult3.song ?? []) {
     if (song.albumId === undefined) continue;
-    if (!byAlbum.has(song.albumId)) byAlbum.set(song.albumId, []);
-    byAlbum.get(song.albumId).push(song);
+    const mark = typeof song.path === 'string' ? CUT.exec(song.path) : null;
+    const image = mark === null ? song.path : song.path.replace(CUT, mark[2] ?? '');
+    const key = `${song.albumId}\u0000${image}`;
+    if (!images.has(key)) images.set(key, []);
+    images.get(key).push(song);
   }
 
-  const cut = [...byAlbum.values()].find(
-    (group) => group.length >= 2 && group.every((song) => song.path === group[0].path),
-  );
+  const cut = [...images.values()].find((group) => group.length >= 2);
   if (cut === undefined) {
     return { skipped: 'no cue-split record among the first 500 songs — this library is all whole files' };
+  }
+
+  // **The defect itself, and the reason this step exists** (issue:100): a
+  // client keys a song by its path — Symfonium's own rule is *"songs with the
+  // same file are supposed to be the same song"* — so songs of one image that
+  // share a path are one song to it, and it plays the first track of the record
+  // twelve times. Every song here carries a cut number of its own, and the
+  // number is the one the record gives it: a path reading `track 9` beside
+  // `track: 3` is the same defect one field over.
+  for (const song of cut) {
+    const mark = typeof song.path === 'string' ? CUT.exec(song.path) : null;
+    if (mark === null) {
+      throw new Error(
+        `${cut.length} songs of one image all answer with the path ${song.path} — a client keys them as one song (issue:100)`,
+      );
+    }
+    if (Number(mark[1]) !== song.track) {
+      throw new Error(
+        `${song.title}: the path says track ${mark[1]} where the record says track ${song.track}`,
+      );
+    }
   }
 
   // What a segment promises changed when seeking was made to work (`6fea2b6`):
@@ -358,6 +392,15 @@ await step('a track cut out of an image is served as a track, and says so', asyn
   }
   if (served.length !== 100) {
     throw new Error(`${cut[0].title}: content-length ${served.length}, expected 100`);
+  }
+  // `size` is the song's own share of the image, and a song whose image nobody
+  // measured a bitrate for is handed none at all rather than the image's
+  // (`sizeOf`) — in which case there is no promise here to hold the answer to,
+  // and saying so beats comparing against `undefined` and passing silently.
+  if (cut[0].size === undefined) {
+    return {
+      skipped: `${cut.length} songs of one image found and each has its own path, but no size was measured for the image to hold a range against`,
+    };
   }
   if (total === 0 || total > cut[0].size * 1.5) {
     throw new Error(

@@ -32,7 +32,7 @@ export const API_VERSION = '1.16.1';
  * module every route depends on.
  */
 export const SERVER_TYPE = 'funoteka';
-export const SERVER_VERSION = '0.1.4';
+export const SERVER_VERSION = '0.1.5';
 
 /**
  * The fields every answer carries, whatever the answer is.

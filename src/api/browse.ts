@@ -202,6 +202,36 @@ function pathOf(rootPath: string, relPath: string): string {
 }
 
 /**
+ * Where the *song* is, which for a song cut out of an image is not the same
+ * question as where the file is.
+ *
+ * Every song of a cue-split record is cut from the one image, so all of them
+ * named the image and a client with an offline cache read them as one song:
+ * Symfonium's rule, in its author's words, is *"songs with the same file are
+ * supposed to be the same song so they are not downloaded multiple times"* —
+ * and it played the first track of a twelve-track record twelve times
+ * (issue:100). The path is what it keys on, so the path has to be the song's.
+ *
+ * The image's own path stays in it, because that is the file the bytes come
+ * from and the one place a person can find them; the cut number is what makes
+ * it this song's. The number is the track's `ordinal`, which the schema keys
+ * `UNIQUE (album_id, ordinal)` on and no rescan moves, so two songs of one
+ * image can never be handed the same path — and the extension stays last,
+ * because a client reading it to decide what the file is reads the end.
+ *
+ * A whole file is its own answer, unchanged.
+ */
+function songPathOf(row: SongRow): string {
+  const path = pathOf(row.root_path, row.rel_path);
+  if (row.segment_start_ms === null) return path;
+
+  const dot = path.lastIndexOf('.');
+  const cut = dot > Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) ? dot : path.length;
+
+  return `${path.slice(0, cut)} (track ${row.ordinal})${path.slice(cut)}`;
+}
+
+/**
  * What a song with no name is called on the wire.
  *
  * The meta layer keeps null there on purpose — a cue that says `(empty)` has
@@ -291,9 +321,19 @@ export function explicitStatusOf(itunes: string | null, mp4: string | null): str
  * album listing would be a thousand times worse. What the row *does* hold is
  * enough to estimate it: the file's bitrate, which is the encoding the track is
  * cut from and so the same bytes per second, and the track's own length.
- * Measured against a real cut of this collection — Whole Lotta Love out of a
- * 510 MB image — **68 334 081 against 68 863 475 bytes, 0.8% low**, the
- * difference being the header the cut rebuilds and the frame headers it adds.
+ * Measured against real cuts of this collection — Whole Lotta Love out of a
+ * 510 MB image, and `tr-858` out of the 486 MB Breakstorm image — the estimate
+ * lands **68 334 081 against 68 863 475 bytes (0.8% low)** and **42 637 432
+ * against 37 735 326 bytes (13% high)**, the difference being the header the
+ * cut rebuilds, the frame headers it adds, and how far the track's own frames
+ * sit from the image's average bitrate. So it is an estimate with a spread of
+ * roughly this shape, not a length, and clients are told one deliberately: a
+ * client that preloads by size is owed *a* budget, and the exact total is on
+ * the answer itself (`Content-Range` of `stream`), which is where a player
+ * that needs the number reads it. Dropping the field instead was the other
+ * option (issue:100, п.3) and was turned down — `size` absent surprises more
+ * clients than `size` 13% high, and `Req. No` only means a client may not
+ * insist.
  *
  * Where the bitrate was never measured there is no estimate to make, and the
  * field is left out rather than filled with the image's size again: `size` is
@@ -438,7 +478,7 @@ export function songChild(row: SongRow, parent: string): Payload {
     duration: seconds(row.duration_ms),
     suffix: row.ext,
     contentType: contentType(row.ext),
-    path: pathOf(row.root_path, row.rel_path),
+    path: songPathOf(row),
     isVideo: false,
     type: 'music',
     // The listener's own marks on this song, absent when there are none.
