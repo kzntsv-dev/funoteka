@@ -48,6 +48,39 @@ function producer(bytes: string): { calls: number; produce: (target: string) => 
   return state;
 }
 
+/**
+ * The longest the loop could not turn, in milliseconds, while `work` ran.
+ *
+ * `setImmediate` and not a timer: on Windows the clock granularity is ~15 ms, so
+ * an idle loop already shows 15 ms gaps and a 30 ms block hides inside them,
+ * while `setImmediate` runs once per turn of the loop and the longest gap is
+ * then exactly "how long the loop was unable to turn".
+ *
+ * The **wall time of `work`** comes back with it, because that is the number the
+ * gap has to be read against — see the test below.
+ */
+async function longestGapWhile(work: () => Promise<void>): Promise<{ worst: number; ran: number }> {
+  let last = process.hrtime.bigint();
+  let worst = 0;
+  let sampling = true;
+  const sample = (): void => {
+    if (!sampling) return;
+    const now = process.hrtime.bigint();
+    worst = Math.max(worst, Number(now - last) / 1e6);
+    last = now;
+    setImmediate(sample);
+  };
+  setImmediate(sample);
+
+  const started = process.hrtime.bigint();
+  try {
+    await work();
+  } finally {
+    sampling = false;
+  }
+  return { worst, ran: Number(process.hrtime.bigint() - started) / 1e6 };
+}
+
 const KEYS = ['a', 'b', 'c', 'd', 'e', 'f', '9', 'h'] as const;
 const once = (index: number): string => (KEYS[index] as string).repeat(8);
 
@@ -304,46 +337,65 @@ test('the walk that trims the cache does not hold the thread that answers', asyn
   // runs files in parallel by default: a garbage collection or a neighbouring
   // test can stretch one turn of this loop well past anything the code does. A
   // tight bound would fail for the weather; the bound that matters is the one
-  // that separates "batched" from "unbatched", and 97 ms is where the unbounded
-  // form sits (review umbrella, task:2926). Raised from 50 to 200 for that
-  // reason — still less than a quarter of what the form it guards against
-  // measured, and no longer reachable by a busy machine.
+  // that separates "batched" from "unbatched" (review umbrella, task:2926).
+  //
+  // **And a constant bound was still wrong**, which is the second half of the
+  // lesson. It was raised from 50 to 200 so that a busy machine could not reach
+  // it, and a busy machine reached it anyway: 247.6 ms on one full-suite run of
+  // this machine and 293.6 ms on the next, against 200 (issue:115; the same file
+  // alone passes). The constant was measuring the box rather than the code —
+  // the walk contributed its usual few milliseconds and the machine's own
+  // starvation contributed the rest.
+  //
+  // **A bound against the machine's *idle* noise does not work either, and that
+  // was measured rather than assumed.** Instrumented with four processes
+  // spinning hot, the loop's idle gaps moved from 22.4 ms to 25.8 ms — barely
+  // at all — while this walk's worst gap moved from 109.6 ms to 333.2 ms. The
+  // starvation that matters is the walk's *own* work waiting for a CPU, and a
+  // loop with nothing to do does not show it.
+  //
+  // **What does scale is the walk itself**, so the gap is read against it:
+  //
+  //   quiet machine     worst 109.6 ms, walk 2737 ms   → the stall is  4% of it
+  //   four burners      worst 333.2 ms, walk 3108 ms   → the stall is 11% of it
+  //   the synchronous   worst ≈ the walk               → the stall is ~all of it
+  //   walk (806 ms)
+  //
+  // So the bound is **a quarter of the walk's own wall time**, with the old 200
+  // ms kept as a floor for a walk too short to calibrate anything. The property
+  // asserted is the one that was meant all along: *the loop kept turning while
+  // the walk ran* — no single stall may be a large share of the work. It is
+  // scale-free, so a slower machine buys itself a larger budget in the same
+  // breath as it produces larger gaps.
   const HeldTooLong = 200;
+  const StallShare = 4;
   await withCache(async (dir) => {
     mkdirSync(dir, { recursive: true });
     const answers = 4000;
     for (let n = 0; n < answers; n += 1) writeFileSync(join(dir, `old${n}.flac`), '0123456789');
 
-    let last = process.hrtime.bigint();
-    let worst = 0;
-    let sampling = true;
-    const sample = (): void => {
-      if (!sampling) return;
-      const now = process.hrtime.bigint();
-      worst = Math.max(worst, Number(now - last) / 1e6);
-      last = now;
-      setImmediate(sample);
-    };
-    setImmediate(sample);
-
-    // Over its cap, so the walk not only reads the directory but trims it.
-    await kept({
-      dir,
-      key: once(1),
-      extension: '.flac',
-      produce: producer('0123456789').produce,
-      cap: 1000,
+    const { worst, ran } = await longestGapWhile(async () => {
+      // Over its cap, so the walk not only reads the directory but trims it.
+      await kept({
+        dir,
+        key: once(1),
+        extension: '.flac',
+        produce: producer('0123456789').produce,
+        cap: 1000,
+      });
+      // The trim no longer rides on `kept` (task:2927), so the sampler has to be
+      // told to keep watching until the walk it guards has actually happened —
+      // otherwise this measures nothing and passes for the wrong reason.
+      await trimmed();
     });
-    // The trim no longer rides on `kept` (task:2927), so the sampler has to be
-    // told to keep watching until the walk it guards has actually happened —
-    // otherwise this measures nothing and passes for the wrong reason.
-    await trimmed();
-    sampling = false;
 
+    const budget = Math.max(HeldTooLong, ran / StallShare);
     assert.ok(
-      worst < HeldTooLong,
-      `the loop was held for ${worst.toFixed(1)} ms — a synchronous walk of ` +
-        `${answers} answers is ~132 ms, and the pool is what keeps it out of here`,
+      worst < budget,
+      `the loop was held for ${worst.toFixed(1)} ms while the walk ran for ` +
+        `${ran.toFixed(0)} ms — that is ${((worst / ran) * 100).toFixed(0)}% of the walk, ` +
+        `and the bound was ${budget.toFixed(0)} ms; a synchronous walk of ${answers} answers ` +
+        `holds it for the whole walk, and the pool is what keeps it out of here`,
     );
   });
 });

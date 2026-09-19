@@ -253,3 +253,21 @@ export function binaryRoute(method: string): BinaryRoute | undefined {
     throw stubRefusal(reason);
   };
 }
+
+/**
+ * Every method this build answers for real, envelope and bytes together.
+ *
+ * The two maps above are the list, and a reader counting them by hand is what
+ * this exists to spare: what this server answers is the one thing it says about
+ * itself that a client developer plans against, and a list kept by hand is a
+ * list that goes stale. `docs/OPENSUBSONIC.md` is where it is written out for
+ * them, and `test/docs-opensubsonic.test.ts` holds that page against this
+ * function — so a method added to `ROUTES` fails a test until the page names it.
+ *
+ * The *empty* half is deliberately not here: `STUBBED` and `STUBBED_BYTES` in
+ * `stubs.ts` are their own list, and the difference between the two is exactly
+ * what the page has to keep apart.
+ */
+export function answeredMethods(): readonly string[] {
+  return [...ROUTES.keys(), ...BINARY.keys()];
+}

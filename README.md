@@ -157,6 +157,8 @@ classification and you edit that layer, not your music.
 
 ## Documentation
 
+- `docs/OPENSUBSONIC.md` — what the server implements, endpoint by endpoint: every
+  method, every OpenSubsonic extension, and what is answered empty on purpose
 - `DEPLOY.md` — install, configure and manage, written to be read by an agent
 - The admin API and the MCP server — `DEPLOY.md` §11
 - Something broken, or missing: [an issue](https://github.com/kzntsv-dev/funoteka/issues) — say

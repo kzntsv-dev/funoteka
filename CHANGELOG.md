@@ -7,7 +7,16 @@ The version lives in exactly one place — `package.json`.
 
 ## [Unreleased]
 
-_(nothing yet)_
+### Added
+
+- **`docs/OPENSUBSONIC.md` — what this server implements, endpoint by endpoint.**
+  Written because the OpenSubsonic project asked for one: a client developer should be
+  able to see what can be tested against a server without reading its source. Every
+  answerable method, the five announced extensions, every method answered empty or
+  refused, and the three that are not there at all. The page is held to the router by
+  `test/docs-opensubsonic.test.ts`, so a method added to `ROUTES` fails a test until
+  the page names it — and a stub that becomes real fails it until the page moves it
+  out of the empty half.
 
 ## [0.1.5] — 2026-09-18
 
